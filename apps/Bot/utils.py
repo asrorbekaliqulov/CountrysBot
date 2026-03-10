@@ -45,9 +45,4 @@ def create_referral(referrer, referred_user, referral_price=0.0):
 
 
 
-def quotes():
-    url = "https://quotes-api-self.vercel.app/quote"
-    result = requests.get(url)
-    return result.json()
-
 

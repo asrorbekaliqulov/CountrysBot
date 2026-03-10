@@ -1,2 +1,2 @@
-# CountrysBot
-Telegram bot with information about countries
+# Python telegram bot + Django admin
+Telegram bot with django admin
