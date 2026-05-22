@@ -1,7 +1,7 @@
 amqp==5.3.1
 anyio==4.9.0
 APScheduler==3.11.2
-asgiref==3.8.1
+asgiref==3.11.1
 attrs==25.3.0
 autopep8==2.3.2
 beautifulsoup4==4.13.4
@@ -16,11 +16,12 @@ click-didyoumean==0.3.1
 click-plugins==1.1.1
 click-repl==0.3.0
 colorama==0.4.6
-Django==5.1.5
+Django==6.0.5
 django-ckeditor==6.7.3
 django-ckeditor-5==0.2.13
 django-ckeditor5==0.0.4
 django-cors-headers==4.3.1
+django-filter @ git+https://github.com/carltongibson/django-filter.git@ec717ea11378a4dc003cbe2f77b5211d8815a0b6
 django-jazzmin==2.6.1
 django-js-asset==3.1.2
 django-modeltranslation==0.18.11
@@ -34,7 +35,8 @@ djangorestframework-simplejwt==5.3.1
 drf-spectacular==0.27.1
 drf-spectacular-sidecar==2024.3.4
 flower==2.0.1
-geopy
+geographiclib==2.1
+geopy==2.4.1
 gprof2dot==2025.4.14
 gunicorn==21.2.0
 h11==0.16.0
@@ -47,6 +49,7 @@ jsonschema==4.24.0
 jsonschema-specifications==2025.4.1
 kombu==5.5.4
 mypy_extensions==1.1.0
+ngrok==1.7.0
 packaging==25.0
 pathspec==0.12.1
 pillow==10.2.0
