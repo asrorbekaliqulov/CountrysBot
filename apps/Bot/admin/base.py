@@ -35,3 +35,258 @@ class AppealAdmin(ModelAdmin):
     list_display = ('user', 'message', 'created_at')
     search_fields = ('user__username', 'message')
     list_filter = ('created_at',)
+
+from django.contrib import admin
+from django.utils.html import format_html
+from django.contrib import messages
+
+# django-unfold uchun kerakli klasslarni import qilamiz
+from unfold.admin import ModelAdmin, StackedInline, TabularInline
+from unfold.decorators import action, display
+
+from apps.Bot.models.orders import Service, Order, Payment
+from apps.Bot.models.bot import Region, District, BotSetting
+
+# ==============================================================================
+# 1. INLINES (Unfold dizaynidagi ichma-ich bloklar)
+# ==============================================================================
+
+
+
+class DistrictInline(TabularInline):
+    """Viloyat ichida tumanlarni chiroyli jadval ko'rinishida tahrirlash"""
+    model = District
+    extra = 1
+    fields = ('name', 'is_active', 'delivery_price', 'geo_fetched')
+    readonly_fields = ('geo_fetched',)
+
+
+# ==============================================================================
+# 2. MODEL ADMINS (Unfold bilan moslashtirilgan asosiy boshqaruv)
+# ==============================================================================
+
+@admin.register(Service)
+class ServiceAdmin(ModelAdmin):
+    """Xizmatlar / Tahlillar boshqaruvi"""
+    list_display = ('name_uz', 'name_ru', 'price_display', 'is_active', 'status_badge')
+    list_filter = ('is_active',)
+    search_fields = ('name_uz', 'name_ru', 'name_en', 'description')
+    list_editable = ('is_active',)
+    
+    fieldsets = (
+        ("Xizmat Nomlari (Ko'p tilli)", {
+            'fields': ('name_uz', 'name_ru', 'name_en'),
+        }),
+        ("Moliyaviy va Holat", {
+            'fields': ('price', 'is_active', 'description'),
+        }),
+    )
+
+    # TUZATISH: header=True parametridan oddiy tasvirlashda foydalanilmaydi, uni olib tashlaymiz
+    @display(description="Narxi (UZS)")
+    def price_display(self, obj):
+        return f"{obj.price:,.2f} UZS".replace(",", " ")
+
+    @display(description="Unfold Nishoni", boolean=True)
+    def status_badge(self, obj):
+        return obj.is_active
+
+
+# ==============================================================================
+# 1. INLINES (To'g'rilangan variant)
+# ==============================================================================
+
+class PaymentInline(StackedInline):
+    model = Payment
+    extra = 0
+    tab = True
+    fields = ('method', 'status', 'amount', 'transaction_id', 'card_mask', 'screenshot_preview', 'screenshot')
+    readonly_fields = ('screenshot_preview',)
+
+    def screenshot_preview(self, obj):
+        # TUZATISH: format_html ichiga url parametrini argument sifatida uzatamiz {} orqali
+        if obj and obj.screenshot:
+            return format_html(
+                '<a href="{0}" target="_blank">'
+                '<img src="{0}" style="max-height: 180px; border-radius: 12px; border: 2px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);"/>'
+                '</a>', 
+                obj.screenshot.url
+            )
+        # TUZATISH: Argument yo'q joyda format_html o'rniga oddiy matn yoki {} bilan format_html ishlatiladi
+        return format_html('<span class="text-xs text-gray-400 font-medium">{text}</span>', text="Screenshot yuklanmagan")
+    screenshot_preview.short_description = "Chek nusxasi"
+
+
+# ==============================================================================
+# 2. ORDER ADMIN (To'g'rilangan variant)
+# ==============================================================================
+
+@admin.register(Order)
+class OrderAdmin(ModelAdmin):
+    list_display = ('id', 'patient_name', 'service', 'patient_type_badge', 'total_price_display', 'payment_status', 'status', 'created_at')
+    list_filter = ('status', 'patient_type', 'patient_gender', 'created_at', 'district')
+    search_fields = ('patient_name', 'user__username', 'user__first_name', 'id', 'pickup_slot')
+    list_editable = ('status',)
+    inlines = [PaymentInline]
+    list_filter_submit = True
+    
+    fieldsets = (
+        ("Asosiy Holat va Miqdori", {'fields': ('user', 'service', 'status')}),
+        ("Bemor Shaxsiy Ma'lumotlari", {'fields': ('patient_type', 'patient_name', 'patient_age', 'patient_gender')}),
+        ("Bola uchun qo'shimcha (Qadam 4)", {'fields': ('child_timing', 'uses_diaper'), 'classes': ('collapse',)}),
+        ("Shikoyatlar ro'yxati (Qadam 5)", {'fields': ('complaints', 'custom_complaint')}),
+        ("Yetkazib berish manzil va vaqti", {'fields': ('pickup_slot', 'district', 'address_note', 'latitude', 'longitude')}),
+        ("Moliyaviy hisob-kitob", {'fields': ('base_price', 'extra_fee', 'total_price')}),
+    )
+
+    @display(description="Jami summa")
+    def total_price_display(self, obj):
+        return f"{obj.total_price:,.0f} UZS".replace(",", " ")
+
+    @display(description="Bemor turi")
+    def patient_type_badge(self, obj):
+        return "Katta yoshli 🧑" if obj.patient_type == 'adult' else "Yosh bola 👶"
+
+    # TUZATISH: format_html parametrlarini to'g'ri taqsimlaymiz
+    @display(description="To'lov Holati")
+    def payment_status(self, obj):
+        try:
+            # Agar yangi buyurtma qo'shilayotgan bo'lsa (obj.id yo'q bo'lsa) yoki payment bog'lanmagan bo'lsa
+            if not obj or not hasattr(obj, 'payment') or not obj.payment:
+                return format_html('<span class="text-xs text-gray-400 italic">{text}</span>', text="To'lov yo'q")
+                
+            payment = obj.payment
+            status = payment.status
+            method = payment.get_method_display()
+            
+            if status == 'success':
+                return format_html(
+                    '<span class="bg-green-50 text-green-700 border border-green-200 px-2.5 py-0.5 rounded-full text-xs font-semibold inline-flex items-center gap-1">'
+                    '● {status_text}</span> <span class="text-xs text-gray-400">({method_text})</span>', 
+                    status_text="Muvaffaqiyatli", method_text=method
+                )
+            elif status == 'failed':
+                return format_html(
+                    '<span class="bg-red-50 text-red-700 border border-red-200 px-2.5 py-0.5 rounded-full text-xs font-semibold inline-flex items-center gap-1">'
+                    '● {status_text}</span> <span class="text-xs text-gray-400">({method_text})</span>', 
+                    status_text="Xatolik", method_text=method
+                )
+            else:
+                return format_html(
+                    '<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full text-xs font-semibold inline-flex items-center gap-1">'
+                    '● {status_text}</span> <span class="text-xs text-gray-400">({method_text})</span>', 
+                    status_text="Kutilmoqda", method_text=method
+                )
+        except (Payment.DoesNotExist, AttributeError):
+            return format_html('<span class="text-xs text-gray-400 italic">{text}</span>', text="To'lov yo'q")
+        
+@admin.register(Region)
+class RegionAdmin(ModelAdmin):
+    """Viloyatlar boshqaruvi"""
+    list_display = ('id', 'name', 'json_id', 'districts_count')
+    search_fields = ('name', 'json_id')
+    inlines = [DistrictInline]
+
+    @display(description="Tumanlar soni")
+    def districts_count(self, obj):
+        return obj.districts.count()
+
+
+@admin.register(District)
+class DistrictAdmin(ModelAdmin):
+    """Tumanlar boshqaruvi va Geopy koordinatalari"""
+    list_display = ('name', 'region', 'is_active', 'delivery_price_display', 'geo_fetched_badge', 'coordinates_display')
+    list_filter = ('is_active', 'geo_fetched', 'region')
+    search_fields = ('name', 'region__name', 'geo_address')
+    list_editable = ('is_active',)
+    
+    # Unfold Actions (Ro'yxatdan tanlab bajariladigan buyruqlar)
+    actions = ['refresh_coordinates']
+
+    fieldsets = (
+        ("Hududiy bog'liqlik", {
+            'fields': ('region', 'name', 'json_id'),
+        }),
+        ("Xizmat sozlamalari", {
+            'fields': ('is_active', 'delivery_price'),
+        }),
+        ("Geolokatsiya (Geopy Nominatim)", {
+            'fields': ('geo_fetched', 'latitude', 'longitude', 'geo_address'),
+        }),
+    )
+
+    @display(description="Yetkazish narxi")
+    def delivery_price_display(self, obj):
+        return f"{obj.delivery_price:,} so'm".replace(",", " ")
+
+    @display(description="Geo Holati", boolean=True)
+    def geo_fetched_badge(self, obj):
+        return obj.geo_fetched
+
+    @display(description="Koordinatalar (Lat, Lon)")
+    def coordinates_display(self, obj):
+        if obj.latitude and obj.longitude:
+            return f"{obj.latitude:.4f}, {obj.longitude:.4f}"
+        return format_html('<span class="text-red-500 font-medium text-xs">Koordinata yo\'q</span>')
+
+    def save_model(self, request, obj, form, change):
+        if not change or 'name' in form.changed_data:
+            obj.geo_fetched = False
+            
+        super().save_model(request, obj, form, change)
+        
+        if not obj.geo_fetched:
+            obj.fetch_coordinates(force=True)
+            if obj.geo_fetched:
+                self.message_user(request, f"{obj.name} uchun geolokatsiya aniqlandi.", messages.SUCCESS)
+            else:
+                self.message_user(request, f"{obj.name} geolokatsiyasi topilmadi!", messages.WARNING)
+
+    # Unfold mos decoratorli Action funksiyasi
+    @action(description="Tanlangan tumanlar koordinatalarini qayta yangilash")
+    def refresh_coordinates(self, request, queryset):
+        success_count = 0
+        for district in queryset:
+            district.fetch_coordinates(force=True)
+            if district.geo_fetched:
+                success_count += 1
+        
+        self.message_user(
+            request, 
+            f"{queryset.count()} tuman tekshirildi. {success_count} tasi yangilandi.", 
+            messages.SUCCESS
+        )
+
+
+@admin.register(BotSetting)
+class BotSettingAdmin(ModelAdmin):
+    """Bot sozlamalari"""
+    list_display = ('key', 'value_trimmed')
+    search_fields = ('key', 'value')
+    
+    def value_trimmed(self, obj):
+        if len(obj.value) > 75:
+            return f"{obj.value[:75]}..."
+        return obj.value
+    value_trimmed.short_description = "Qiymati"
+
+
+@admin.register(Payment)
+class PaymentAdmin(ModelAdmin):
+    """To'lovlarni alohida Unfold paneli"""
+    list_display = ('id', 'order', 'amount_display', 'method', 'status', 'created_at')
+    list_filter = ('method', 'status', 'created_at')
+    search_fields = ('transaction_id', 'card_mask', 'order__patient_name')
+    readonly_fields = ('screenshot_preview',)
+    
+    fields = ('order', 'amount', 'method', 'status', 'transaction_id', 'card_mask', 'screenshot', 'screenshot_preview')
+
+    @display(description="To'lov summasi")
+    def amount_display(self, obj):
+        return f"{obj.amount:,.0f} UZS".replace(",", " ")
+
+    def screenshot_preview(self, obj):
+        if obj.screenshot:
+            return format_html('<a href="{0}" target="_blank"><img src="{0}" style="max-height: 250px; border-radius: 12px; border: 1px solid #e2e8f0;"/></a>', obj.screenshot.url)
+        return "Screenshot yuklanmagan"
+    screenshot_preview.short_description = "Chek nusxasi"

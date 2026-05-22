@@ -1,0 +1,837 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="{{ request.LANGUAGE_CODE|default:'uz' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>"Tibbiy Buyurtma"</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root{
+            --bg:#f6f7fb;
+            --surface:#ffffff;
+            --ink:#1f2433;
+            --muted:#7a8194;
+            --line:#ecedf3;
+            --brand:#5b6cff;
+            --brand-soft:#eef0ff;
+            --brand-ink:#3a48cc;
+            --ok:#10b981;
+            --warn:#f59e0b;
+            --danger:#ef4444;
+        }
+        html,body{background:var(--bg);color:var(--ink);}
+        body{font-family:'Inter',ui-sans-serif,system-ui,-apple-system,sans-serif;}
+        .step-panel{display:none;}
+        .step-panel.active{display:block;animation:fadeIn .25s ease;}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+        .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;}
+        .soft-input{background:#fafbff;border:1px solid var(--line);border-radius:14px;height:52px;padding:0 14px;width:100%;font-size:15px;color:var(--ink);transition:all .15s;}
+        .soft-input:focus{outline:none;border-color:var(--brand);background:#fff;box-shadow:0 0 0 4px rgba(91,108,255,.12);}
+        .pill{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500;color:var(--ink);}
+        .pill:hover{border-color:#c8cdf2;}
+        .pill.selected{background:var(--brand-soft);border-color:var(--brand);color:var(--brand-ink);box-shadow:0 0 0 3px rgba(91,108,255,.10);}
+        .tile{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;cursor:pointer;transition:all .15s;}
+        .tile:hover{border-color:#c8cdf2;}
+        .tile.selected{background:var(--brand-soft);border-color:var(--brand);box-shadow:0 0 0 3px rgba(91,108,255,.10);}
+        .label{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:6px;display:block;}
+        .primary-btn{background:var(--brand);color:#fff;border-radius:16px;height:56px;font-weight:600;font-size:16px;width:100%;transition:transform .1s, background .15s;box-shadow:0 8px 20px -10px rgba(91,108,255,.6);}
+        .primary-btn:hover{background:var(--brand-ink);}
+        .primary-btn:active{transform:scale(.98);}
+        .ghost-btn{background:transparent;color:var(--brand-ink);font-weight:500;font-size:14px;}
+        .success-btn{background:var(--ok);box-shadow:0 8px 20px -10px rgba(16,185,129,.6);}
+        .success-btn:hover{background:#0ea372;}
+        .progress-track{background:var(--line);height:6px;border-radius:999px;overflow:hidden;}
+        .progress-fill{background:linear-gradient(90deg,#7c8cff,#5b6cff);height:100%;border-radius:999px;transition:width .35s ease;}
+        .chip{display:inline-flex;align-items:center;gap:6px;background:var(--brand-soft);color:var(--brand-ink);padding:6px 10px;border-radius:999px;font-size:12px;font-weight:500;}
+        .checkbox-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;}
+        .checkbox-card:has(input:checked){background:var(--brand-soft);border-color:var(--brand);}
+        .checkbox-card input{accent-color:var(--brand);width:18px;height:18px;}
+        #map{height:200px;border-radius:14px;overflow:hidden;border:1px solid var(--line);}
+        .location-btn{background:linear-gradient(135deg,#5b6cff,#7c8cff);color:#fff;border-radius:16px;padding:18px;display:flex;align-items:center;gap:12px;width:100%;font-weight:600;cursor:pointer;transition:transform .1s;box-shadow:0 10px 24px -12px rgba(91,108,255,.7);}
+        .location-btn:active{transform:scale(.99);}
+        .alert{border-radius:14px;padding:12px 14px;font-size:13px;display:flex;gap:10px;align-items:flex-start;}
+        .alert-warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;}
+        .alert-ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;}
+        .alert-err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;}
+        .skel{background:linear-gradient(90deg,#eef0f5 25%,#f6f7fb 50%,#eef0f5 75%);background-size:200% 100%;animation:sk 1.2s infinite;border-radius:14px;}
+        @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        select.soft-input{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%237a8194' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;}
+
+        /* ── Popup modal ── */
+        #districtModal{position:fixed;inset:0;z-index:9999;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
+        #districtModal.open{opacity:1;pointer-events:all;}
+        #districtModal .modal-backdrop{position:absolute;inset:0;background:rgba(15,18,35,.45);backdrop-filter:blur(2px);}
+        #districtModal .modal-sheet{position:relative;width:100%;max-width:448px;background:var(--surface);border-radius:26px 26px 0 0;padding:24px 20px 36px;transform:translateY(40px);transition:transform .28s cubic-bezier(.34,1.3,.64,1);}
+        #districtModal.open .modal-sheet{transform:translateY(0);}
+        .modal-handle{width:38px;height:4px;background:var(--line);border-radius:99px;margin:0 auto 20px;}
+        .modal-district-btn{background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:all .15s;width:100%;text-align:left;margin-bottom:8px;}
+        .modal-district-btn:hover{border-color:var(--brand);background:var(--brand-soft);}
+        .modal-district-btn .dist-name{font-weight:600;font-size:14px;color:var(--ink);}
+        .modal-district-btn .dist-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+        .modal-district-btn .dist-km{font-size:12px;font-weight:600;color:var(--brand-ink);background:var(--brand-soft);padding:4px 8px;border-radius:99px;}
+        .addr-box{background:#f4f5ff;border:1px solid #d6d9ff;border-radius:14px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#3a3f6e;display:flex;gap:10px;align-items:flex-start;}
+    </style>
+</head>
+<body class="pb-6">
+
+    <div class="max-w-md mx-auto min-h-screen flex flex-col" style="background:var(--bg);">
+        <header class="px-5 pt-4 pb-3 sticky top-0 z-50" style="background:var(--bg);">
+            <div class="flex items-center justify-between mb-2">
+                <button id="prevBtn" class="ghost-btn invisible" onclick="prevStep()">← "Orqaga"</button>
+                <span id="stepIndicator" class="text-xs font-medium" style="color:var(--muted)">1 / 8</span>
+                <span class="w-12"></span>
+            </div>
+            <div class="progress-track">
+                <div id="progressBar" class="progress-fill" style="width:0%"></div>
+            </div>
+        </header>
+
+        <main class="px-5 pt-2 pb-4 flex-1">
+            <form id="wizardForm" onsubmit="event.preventDefault();">
+                {% csrf_token %}
+
+                <section id="step1" class="step-panel space-y-3">
+                    <div class="mb-4">
+                        <h2 class="text-xl font-semibold">"Xizmatni tanlang"</h2>
+                        <p class="text-sm" style="color:var(--muted)">"Sizga mos tahlil turini belgilang"</p>
+                    </div>
+                    <div id="servicesList" class="space-y-3">
+                        <div class="skel h-20"></div>
+                        <div class="skel h-20"></div>
+                    </div>
+                </section>
+
+                <section id="step2" class="step-panel space-y-4">
+                    <div class="mb-2">
+                        <h2 class="text-xl font-semibold">"Bemor kim?"</h2>
+                        <p class="text-sm" style="color:var(--muted)">"Tahlil kim uchun?"</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div onclick="selectPatientType('adult')" id="pTypeAdult" class="tile flex flex-col items-center gap-2 py-6">
+                            <span class="text-4xl">🧑</span><span class="font-medium">"Katta odam"</span>
+                        </div>
+                        <div onclick="selectPatientType('child')" id="pTypeChild" class="tile flex flex-col items-center gap-2 py-6">
+                            <span class="text-4xl">👶</span><span class="font-medium">"Bola"</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="step3" class="step-panel space-y-4">
+                    <div class="mb-2">
+                        <h2 class="text-xl font-semibold">"Bemor ma'lumotlari"</h2>
+                        <p class="text-sm" style="color:var(--muted)">"Asosiy ma'lumotlarni kiriting"</p>
+                    </div>
+                    <div>
+                        <label class="label">"F.I.Sh"</label>
+                        <input type="text" id="patientName" class="soft-input" placeholder="Alisher Haitmirzayev">
+                    </div>
+                    <div>
+                        <label class="label">"Yoshi"</label>
+                        <input type="number" id="patientAge" class="soft-input" placeholder="25">
+                    </div>
+                    <div>
+                        <label class="label">"Jinsi"</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button type="button" onclick="selectGender('male')" id="genderMale" class="pill">👨 "Erkak"</button>
+                            <button type="button" onclick="selectGender('female')" id="genderFemale" class="pill">👩 "Ayol"</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="step4" class="step-panel space-y-4">
+                    <div class="mb-2">
+                        <h2 class="text-xl font-semibold">"Farzandingiz odatda qachon hojatga boradi?"</h2>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3" id="childTimingsGrid"></div>
+                    <div class="card p-4 space-y-3 mt-4">
+                        <p class="text-sm font-medium text-center">"Pampers (Taglik) taqadimi?"</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button type="button" onclick="selectDiaper(true)" id="diaperYes" class="pill">"Ha"</button>
+                            <button type="button" onclick="selectDiaper(false)" id="diaperNo" class="pill">"Yo'q</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="step5" class="step-panel space-y-4">
+                    <div class="mb-2">
+                        <h2 class="text-xl font-semibold">"Shikoyatlaringizni belgilang"</h2>
+                        <p class="text-sm" style="color:var(--muted)">"Bir nechtasini tanlash mumkin"</p>
+                    </div>
+                    <div id="complaintsBox" class="grid grid-cols-2 gap-2 text-sm"></div>
+                    <div>
+                        <label class="label">✍️ "Boshqa belgilar bo'lsa yozing"</label>
+                        <input type="text" id="customComplaint" class="soft-input" placeholder="...">
+                    </div>
+                </section>
+
+                <section id="step6" class="step-panel space-y-4">
+                    <div class="mb-2">
+                        <h2 class="text-xl font-semibold">"Yetkazish vaqti"</h2>
+                        <p class="text-sm" style="color:var(--muted)">"Sizga qulay vaqtni tanlang"</p>
+                    </div>
+                    <div id="slotsBox" class="space-y-2"></div>
+                </section>
+
+                <section id="step7" class="step-panel space-y-4">
+                    <div class="mb-2">
+                        <h2 class="text-xl font-semibold">"Yetkazish manzili"</h2>
+                        <p class="text-sm" style="color:var(--muted)">"Joylashuvingizni yuboring yoki tumanni qo'lda tanlang"</p>
+                    </div>
+
+                    <button type="button" onclick="requestLocation()" id="locBtn" class="location-btn">
+                        <span class="text-2xl">📍</span>
+                        <span class="flex-1 text-left">
+                            <span class="block text-base">{% translate "Joriy joylashuvni yuborish" %}</span>
+                            <span class="block text-xs opacity-80">{% translate "Eng yaqin tumanni avtomatik topamiz" %}</span>
+                        </span>
+                        <span id="locSpinner" class="hidden">⏳</span>
+                    </button>
+
+                    <div id="locResult" class="hidden"></div>
+
+                    <div>
+                        <label class="label">{% translate "Tuman" %}</label>
+                        <select id="districtSelect" class="soft-input" onchange="onDistrictChange()">
+                            <option value="">— {% translate "Tuman tanlang" %} —</option>
+                        </select>
+                    </div>
+
+                    <div id="map"></div>
+
+                    <div>
+                        <label class="label">{% translate "Manzil izohi (Mo'ljal, Uy raqami, Telefon)" %}</label>
+                        <input type="text" id="addressNote" class="soft-input" placeholder="Chilonzor 9-kvartal, 12-uy...">
+                    </div>
+
+                    <div>
+                        <label class="label">📞 Telefon raqam <span style="color:var(--danger)">*</span></label>
+                        <div style="position:relative;">
+                            <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;font-weight:600;color:var(--muted);pointer-events:none;z-index:1">+998</span>
+                            <input type="tel" id="phoneInput" class="soft-input" placeholder="90 123 45 67" style="padding-left:56px;" oninput="formatPhone(this)" maxlength="12">
+                        </div>
+                        <span id="phoneError" style="font-size:12px;color:var(--danger);margin-top:4px;display:none">⚠️ To'liq raqam kiriting: 90 123 45 67</span>
+                    </div>
+                </section>
+
+                <section id="step8" class="step-panel space-y-4">
+                    <div class="mb-2 text-center">
+                        <h2 class="text-xl font-semibold">{% translate "To'lov va Tasdiqlash" %}</h2>
+                        <p class="text-sm" style="color:var(--muted)">{% translate "Buyurtmangizni yakunlang" %}</p>
+                    </div>
+
+                    <div class="card p-4 space-y-3 text-sm">
+                        <div class="flex justify-between"><span style="color:var(--muted)">{% translate "Xizmat" %}</span><span id="summaryService" class="font-medium"></span></div>
+                        <div class="flex justify-between"><span style="color:var(--muted)">{% translate "Bemor" %}</span><span id="summaryPatient" class="font-medium"></span></div>
+                        <div class="flex justify-between"><span style="color:var(--muted)">{% translate "Vaqt" %}</span><span id="summaryTime" class="font-medium"></span></div>
+                        <div class="flex justify-between"><span style="color:var(--muted)">{% translate "Yetkazish" %}</span><span id="summaryDelivery" class="font-medium"></span></div>
+                        <div class="flex justify-between text-base font-semibold pt-3" style="border-top:1px dashed var(--line);color:var(--brand-ink)">
+                            <span>"Jami"</span><span id="summaryTotal"></span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="label">"To'lov turini tanlang"</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div onclick="selectPayMethod('tpay')" id="methodTpay" class="tile text-center py-4">
+                                <span class="block text-base font-semibold" style="color:var(--brand-ink)">Click</span>
+                                <span class="text-xs" style="color:var(--muted)">"Karta orqali onlayn"</span>
+                            </div>
+                            <div onclick="selectPayMethod('admin')" id="methodAdmin" class="tile text-center py-4">
+                                <span class="block text-base font-semibold" style="color:#b45309">"Admin"</span>
+                                <span class="text-xs" style="color:var(--muted)">{% translate "Karta / Chek" %}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="adminScreenshotBlock" class="hidden alert alert-warn flex-col">
+                        <p>📋 <b>8600 1234 5678 9012</b> (X.Alisher) {% translate "kartasiga pul o'tkazib, chek rasmini yuklang:" %}</p>
+                        <input type="file" id="paymentScreenshot" accept="image/*" class="text-xs w-full" style="margin-top:8px;" onchange="document.getElementById('screenshotError').style.display='none'">
+                        <span id="screenshotError" style="display:none;font-size:12px;color:#991b1b;margin-top:6px;">⚠️ Chek rasmini yuklash majburiy</span>
+                    </div>
+                </section>
+
+            </form>
+        </main>
+
+        <footer class="px-5 pt-3 pb-5 sticky bottom-0" style="background:linear-gradient(180deg,transparent,var(--bg) 35%);">
+            <button id="nextBtn" class="primary-btn" onclick="nextStep()">{% translate "Davom etish" %} →</button>
+        </footer>
+    </div>
+
+    <!-- ── Tuman tavsiya popup ── -->
+    <div id="districtModal">
+        <div class="modal-backdrop" onclick="closeDistrictModal()"></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let totalSteps = 8;
+        let servicesData = [];
+        let districtsData = [];
+        let map, marker;
+        let currentLang = "{{ request.LANGUAGE_CODE|default:'uz' }}".toLowerCase().split('-')[0];
+        // Django til kodini aniqlash (JS ichida ishlatish uchun)
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.expand();
+            
+            // Agar Telegram foydalanuvchisi aniqlansa va uning tili bo'lsa
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) {
+                let tgLang = tg.initDataUnsafe.user.language_code.toLowerCase().split('-')[0];
+                if (['uz', 'ru', 'en'].includes(tgLang)) {
+                    currentLang = tgLang; // Telegram tili ustunlikka ega bo'ladi
+                }
+            }
+        }
+
+        console.log("WebApp ishlayotgan joriy til:", currentLang);
+
+        let orderState = {
+            tg_id: "12345678",
+            service: null,
+            patient_type: null,
+            patient_name: '',
+            patient_age: '',
+            patient_gender: null,
+            child_timing: null,
+            uses_diaper: null,
+            complaints: [],
+            custom_complaint: '',
+            pickup_slot: '',
+            district: null,
+            address_note: '',
+            phone: '',
+            latitude: 41.31108,
+            longitude: 69.24056,
+            payment_method: 'tpay'
+        };
+
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.expand();
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                orderState.tg_id = tg.initDataUnsafe.user.id.toString();
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            fetchServices();
+            fetchDistricts();
+            initLeafletMap();
+            renderChildTimings();
+            updateUI();
+        });
+
+        function fetchServices() {
+            // Siz aytganingizdek to'g'ridan-to'g'ri backend API ga so'rov yuboramiz
+            fetch("/api/services/")
+                .then(r => r.json())
+                .then(data => {
+                    console.log("Bazadan kelgan xizmatlar:", data);
+
+                    // Ma'lumot array ekanligini aniq tekshirib olamiz
+                    servicesData = Array.isArray(data) ? data : (data.services || data.results || []);
+                    
+                    if (!servicesData || servicesData.length === 0) {
+                        document.getElementById("servicesList").innerHTML = 
+                            '<div class="alert alert-warn">⚠️ Bazada xizmatlar topilmadi.</div>';
+                        return;
+                    }
+
+                    let html = '';
+                    
+                    servicesData.forEach(s => {
+                        // XAVFSIZ TIL TANLASH:
+                        // Birinchi navbatda 'name_uz' borligini tekshiradi, agar u yo'q bo'lsa 'name' ni oladi.
+                        // Shunda currentLang xato bo'lsa ham frontend umuman buzilmaydi va ma'lumot chiqadi!
+                        const localizedName = s.name_uz || s.name || s.name_ru || s.name_en || "Nomsiz xizmat";
+                        
+                        // XAVFSIZ NARX FORMATLASH:
+                        // Narx satr (string) bo'lsa ham, son bo'lsa ham xavfsiz o'giriydi, xato bermaydi
+                        let priceValue = "0";
+                        if (s.price) {
+                            const parsedPrice = parseFloat(s.price);
+                            if (!isNaN(parsedPrice)) {
+                                priceValue = parsedPrice.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
+                            }
+                        }
+
+                        // HTML obyektini shakllantirish
+                        html += `
+                            <div onclick="selectService(${s.id})" id="srv_${s.id}" class="tile flex items-center justify-between p-4 mb-2 card cursor-pointer">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-11 h-11 rounded-full flex items-center justify-center text-xl" style="background:var(--brand-soft)">🧪</div>
+                                    <div>
+                                        <h4 class="font-medium text-[15px]">${localizedName}</h4>
+                                        <p class="text-sm font-semibold" style="color:var(--brand-ink)">${priceValue} so'm</p>
+                                    </div>
+                                </div>
+                                <span class="text-xl" style="color:var(--muted)">›</span>
+                            </div>`;
+                    });
+
+                    // Mana shu qator oxirida HTML ni ekranga chiqaradi:
+                    document.getElementById("servicesList").innerHTML = html;
+                    console.log("HTML muvaffaqiyatli render qilindi!");
+                })
+                .catch((err) => { 
+                    console.error("Fetch ichida JS xatoligi yuz berdi:", err);
+                    document.getElementById("servicesList").innerHTML = 
+                        '<div class="alert alert-err">❌ Frontendda ma\'lumotni chiqarishda xatolik yuz berdi.</div>'; 
+                });
+        }
+        
+        function fetchDistricts() {
+            fetch("/api/districts/").then(r=>r.json()).then(data => {
+                districtsData = data;
+                let html = '<option value="">— {% translate "Tuman tanlang" %} —</option>';
+                data.forEach(d => { html += `<option value="${d.id}">${d.name}</option>`; });
+                document.getElementById("districtSelect").innerHTML = html;
+            });
+        }
+
+        function initLeafletMap() {
+            map = L.map('map', {zoomControl:true}).setView([orderState.latitude, orderState.longitude], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+            marker = L.marker([orderState.latitude, orderState.longitude], {draggable:true}).addTo(map);
+            marker.on('dragend', () => {
+                const c = marker.getLatLng();
+                orderState.latitude = c.lat; orderState.longitude = c.lng;
+            });
+            map.on('click', e => {
+                marker.setLatLng(e.latlng);
+                orderState.latitude = e.latlng.lat; orderState.longitude = e.latlng.lng;
+            });
+        }
+
+        function haversine(lat1, lon1, lat2, lon2){
+            const R=6371, toRad=x=>x*Math.PI/180;
+            const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+            const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+            return 2*R*Math.asin(Math.sqrt(a));
+        }
+
+        function setLocResult(html){
+            const box = document.getElementById('locResult');
+            box.innerHTML = html;
+            box.classList.remove('hidden');
+        }
+
+        function isDistrictServed(d){
+            if (!d) return false;
+            if (d.is_active === false) return false;
+            if (d.delivery_price === null || d.delivery_price === undefined) return false;
+            return true;
+        }
+
+        function requestLocation(){
+            if (!navigator.geolocation){
+                setLocResult('<div class="alert alert-err">⚠️ Brauzeringiz joylashuvni qo\'llab-quvvatlamaydi</div>');
+                return;
+            }
+            document.getElementById('locSpinner').classList.remove('hidden');
+            navigator.geolocation.getCurrentPosition(onLocOk, onLocErr, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+        }
+
+        async function onLocOk(pos){
+            document.getElementById('locSpinner').classList.add('hidden');
+            const lat = pos.coords.latitude, lng = pos.coords.longitude;
+            orderState.latitude = lat; orderState.longitude = lng;
+            if (map){ map.setView([lat,lng],14); marker.setLatLng([lat,lng]); }
+
+            if (!districtsData.length){
+                setLocResult('<div class="alert alert-warn">Tumanlar ro\'yxati yuklanmadi, qo\'lda tanlang.</div>');
+                return;
+            }
+
+            // 1. Nominatim orqali aniq manzil va tuman nomini olamiz
+            let humanAddress = null;
+            let geoDistrictName = null;
+            try {
+                const geo = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10&addressdetails=1`,
+                    { headers: { 'Accept-Language': 'uz,ru;q=0.8' } }
+                );
+                const geoData = await geo.json();
+                if (geoData && geoData.address) {
+                    const a = geoData.address;
+                    // Nominatim tuman/shahar maydonlari
+                    geoDistrictName = a.city_district || a.suburb || a.county || a.city || a.town || null;
+                    const parts = [
+                        a.road || a.pedestrian,
+                        a.suburb || a.neighbourhood || a.quarter,
+                        a.city_district || a.county,
+                        a.city || a.town || a.village
+                    ].filter(Boolean);
+                    humanAddress = parts.join(', ') || geoData.display_name?.split(',').slice(0,3).join(', ').trim();
+                }
+            } catch(e) { /* geocoding ishlamasa haversine fallbackga o'tamiz */ }
+
+            // 2. Geo nomi orqali bazadan tuman topish (fuzzy match)
+            let matchedByName = null;
+            if (geoDistrictName) {
+                const geoLower = geoDistrictName.toLowerCase().replace(/\s+tuman[i]?/,'').trim();
+                matchedByName = districtsData.find(d => {
+                    const dLower = (d.name || '').toLowerCase().replace(/\s+tuman[i]?/,'').trim();
+                    return dLower === geoLower ||
+                           dLower.includes(geoLower) ||
+                           geoLower.includes(dLower);
+                }) || null;
+            }
+
+            // 3. Barcha tumanlar uchun masofani hisoblaymiz (fallback + tavsiya uchun)
+            let rankedDistricts = [];
+            districtsData.forEach(d => {
+                if (d.latitude == null || d.longitude == null) return;
+                const dist = haversine(lat, lng, parseFloat(d.latitude), parseFloat(d.longitude));
+                rankedDistricts.push({ d, dist });
+            });
+            rankedDistricts.sort((a, b) => a.dist - b.dist);
+
+            // 4. Aniq tuman: geo nomi bo'yicha topilgan, bo'lmasa haversine eng yaqin
+            const detectedEntry = matchedByName
+                ? { d: matchedByName, dist: rankedDistricts.find(r => r.d.id === matchedByName.id)?.dist || 0 }
+                : rankedDistricts[0];
+
+            if (!detectedEntry) {
+                setLocResult('<div class="alert alert-err">Tuman aniqlanmadi, qo\'lda tanlang.</div>');
+                return;
+            }
+
+            const best = detectedEntry.d;
+            const bestDist = detectedEntry.dist;
+
+            if (isDistrictServed(best)) {
+                // ✅ Aniqlangan tuman xizmat ko'rsatadi
+                document.getElementById('districtSelect').value = best.id;
+                orderState.district = String(best.id);
+                setLocResult(`
+                  <div style="border-radius:16px;overflow:hidden;border:1px solid #a7f3d0;">
+                    <div style="background:#ecfdf5;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;">
+                      <span style="font-size:22px;line-height:1">📍</span>
+                      <div>
+                        <div style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Sizning manzilingiz</div>
+                        <div style="font-size:14px;font-weight:700;color:#065f46">${humanAddress || best.name}</div>
+                        <div style="font-size:12px;color:#059669;margin-top:4px">✅ Xizmat bu yerda ishlaydi · Yetkazish: ${parseFloat(best.delivery_price).toLocaleString()} so'm</div>
+                      </div>
+                    </div>
+                  </div>`);
+            } else {
+                // ❌ Aniqlangan tuman xizmat ko'rsatmaydi
+                document.getElementById('districtSelect').value = '';
+                orderState.district = null;
+
+                // Eng yaqin ishlayotgan tuman
+                const nearestServed = rankedDistricts.find(({ d }) => isDistrictServed(d) && d.id !== best.id);
+
+                let recommendHtml = '';
+                if (nearestServed) {
+                    const nd = nearestServed.d;
+                    const ndist = nearestServed.dist;
+                    recommendHtml = `
+                      <div style="border-top:1px solid #fecaca;padding:12px 14px;">
+                        <div style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Tavsiya etilgan yaqin tuman</div>
+                        <button onclick="selectSuggestedDistrict(${nd.id})"
+                          style="width:100%;background:#fff;border:1.5px solid #5b6cff;border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;"
+                          onmouseover="this.style.background='#eef0ff'" onmouseout="this.style.background='#fff'">
+                          <div style="text-align:left">
+                            <div style="font-size:14px;font-weight:700;color:#1f2433">🏘️ ${nd.name}</div>
+                            <div style="font-size:12px;color:#7a8194;margin-top:2px">Yetkazish: ${parseFloat(nd.delivery_price).toLocaleString()} so'm</div>
+                          </div>
+                          <span style="font-size:12px;font-weight:700;color:#3a48cc;background:#eef0ff;padding:4px 10px;border-radius:99px;white-space:nowrap">~${ndist.toFixed(1)} km →</span>
+                        </button>
+                      </div>`;
+                } else {
+                    recommendHtml = `
+                      <div style="border-top:1px solid #fecaca;padding:12px 14px;font-size:13px;color:#9a3412;">
+                        ⚠️ Yaqin atrofda xizmat ko'rsatuvchi tuman topilmadi.
+                      </div>`;
+                }
+
+                setLocResult(`
+                  <div style="border-radius:16px;overflow:hidden;border:1px solid #fecaca;">
+                    <div style="background:#fef2f2;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;">
+                      <span style="font-size:22px;line-height:1">📍</span>
+                      <div>
+                        <div style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Sizning manzilingiz</div>
+                        <div style="font-size:14px;font-weight:700;color:#991b1b">${humanAddress || best.name}</div>
+                        <div style="font-size:12px;color:#dc2626;margin-top:4px">❌ Xizmat bu yerda ishlamaydi</div>
+                      </div>
+                    </div>
+                    ${recommendHtml}
+                  </div>`);
+            }
+        }
+
+        function selectSuggestedDistrict(id) {
+            const d = districtsData.find(x => x.id == id);
+            if (!d) return;
+            document.getElementById('districtSelect').value = id;
+            orderState.district = String(id);
+            if (d.latitude && d.longitude) {
+                map.setView([parseFloat(d.latitude), parseFloat(d.longitude)], 13);
+                marker.setLatLng([parseFloat(d.latitude), parseFloat(d.longitude)]);
+                orderState.latitude = parseFloat(d.latitude);
+                orderState.longitude = parseFloat(d.longitude);
+            }
+            setLocResult(`
+              <div style="border-radius:16px;overflow:hidden;border:1px solid #a7f3d0;">
+                <div style="background:#ecfdf5;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;">
+                  <span style="font-size:22px;line-height:1">✅</span>
+                  <div>
+                    <div style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Tanlangan tuman</div>
+                    <div style="font-size:14px;font-weight:700;color:#065f46">${d.name}</div>
+                    <div style="font-size:12px;color:#059669;margin-top:4px">Yetkazish: ${parseFloat(d.delivery_price).toLocaleString()} so'm</div>
+                  </div>
+                </div>
+              </div>`);
+        }
+
+        function onLocErr(err){
+            document.getElementById('locSpinner').classList.add('hidden');
+            let msg = "Joylashuvni olib bo'lmadi";
+            if (err.code===1) msg = "Joylashuvga ruxsat berilmadi. Iltimos brauzer sozlamalaridan ruxsat bering.";
+            else if (err.code===2) msg = "Joylashuv mavjud emas";
+            else if (err.code===3) msg = "Vaqt tugadi, qayta urinib ko'ring";
+            setLocResult(`<div class="alert alert-err">⚠️ ${msg}</div>`);
+        }
+
+        function updateUI(){
+            document.querySelectorAll(".step-panel").forEach((p,i)=>p.classList.toggle("active",i===currentStep-1));
+            document.getElementById("stepIndicator").innerText = `${currentStep} / ${totalSteps}`;
+            document.getElementById("progressBar").style.width = `${(currentStep/totalSteps)*100}%`;
+            document.getElementById("prevBtn").classList.toggle("invisible", currentStep===1);
+            const nb = document.getElementById("nextBtn");
+            if (currentStep===totalSteps){
+                nb.innerText = "{% translate 'To\'lash' %} 💳";
+                nb.classList.add("success-btn");
+                fillSummary();
+            } else {
+                nb.innerText = "{% translate 'Davom etish' %} →";
+                nb.classList.remove("success-btn");
+            }
+            if (currentStep===7 && map) setTimeout(()=>map.invalidateSize(),200);
+        }
+
+        function nextStep(){
+            if (!validateCurrentStep()) return;
+            if (currentStep===totalSteps){ submitOrderAndPay(); return; }
+            if (currentStep===3 && orderState.patient_type==='adult') currentStep=5;
+            else currentStep++;
+            updateUI();
+        }
+        function prevStep(){
+            if (currentStep===5 && orderState.patient_type==='adult') currentStep=3;
+            else currentStep--;
+            updateUI();
+        }
+
+        function validateCurrentStep(){
+            if (currentStep===1 && !orderState.service){ alert("{% translate 'Xizmat turini tanlang' %}"); return false; }
+            if (currentStep===2 && !orderState.patient_type){ alert("{% translate 'Bemor turini tanlang' %}"); return false; }
+            if (currentStep===3){
+                orderState.patient_name = document.getElementById("patientName").value.trim();
+                orderState.patient_age = document.getElementById("patientAge").value;
+                if (!orderState.patient_name || !orderState.patient_age || !orderState.patient_gender){
+                    alert("{% translate 'Ma\'lumotlarni to\'liq kiriting' %}"); return false;
+                }
+            }
+            if (currentStep===4 && orderState.patient_type==='child'){
+                if (!orderState.child_timing || orderState.uses_diaper===null){
+                    alert("{% translate 'Bola parametrlarini to\'liq kiriting' %}"); return false;
+                }
+            }
+            if (currentStep===6 && !orderState.pickup_slot){ alert("{% translate 'Vaqtni tanlang' %}"); return false; }
+            if (currentStep===8){
+                if (!orderState.payment_method){ alert("To'lov turini tanlang"); return false; }
+                if (orderState.payment_method === 'admin'){
+                    const fi = document.getElementById('paymentScreenshot');
+                    if (!fi.files || fi.files.length === 0){
+                        document.getElementById('screenshotError').style.display = 'block';
+                        return false;
+                    }
+                    document.getElementById('screenshotError').style.display = 'none';
+                }
+            }
+            if (currentStep===7){
+                orderState.district = document.getElementById("districtSelect").value;
+                orderState.address_note = document.getElementById("addressNote").value.trim();
+                const dst = districtsData.find(d=>d.id==orderState.district);
+
+                // Telefon raqam tekshiruvi
+                const phoneRaw = document.getElementById("phoneInput").value.replace(/\D/g,'');
+                const phoneErr = document.getElementById("phoneError");
+                if (phoneRaw.length !== 9) {
+                    phoneErr.style.display = 'block';
+                    document.getElementById("phoneInput").focus();
+                    return false;
+                }
+                phoneErr.style.display = 'none';
+                orderState.phone = '+998' + phoneRaw;
+                // address_note ga telefon raqamni ham qo'shamiz (backend notes uchun)
+                orderState.address_note = orderState.address_note
+                    ? orderState.address_note + ' | Tel: +998' + phoneRaw
+                    : 'Tel: +998' + phoneRaw;
+
+                if (!orderState.district){ alert("{% translate 'Tumanni tanlang' %}"); return false; }
+                if (!isDistrictServed(dst)){ alert("{% translate 'Bu tumanda xizmat mavjud emas' %}"); return false; }
+            }
+            return true;
+        }
+
+        function selectService(id){
+            orderState.service = id;
+            document.querySelectorAll("[id^='srv_']").forEach(el=>el.classList.remove("selected"));
+            document.getElementById(`srv_${id}`).classList.add("selected");
+        }
+
+        function formatPhone(input) {
+            // Faqat raqamlarni qoldiramiz
+            let raw = input.value.replace(/\D/g, '');
+            // 9 raqamdan oshmasin
+            if (raw.length > 9) raw = raw.slice(0, 9);
+            // XX XXX XX XX formati
+            let formatted = '';
+            if (raw.length > 0) formatted = raw.slice(0, 2);
+            if (raw.length > 2) formatted += ' ' + raw.slice(2, 5);
+            if (raw.length > 5) formatted += ' ' + raw.slice(5, 7);
+            if (raw.length > 7) formatted += ' ' + raw.slice(7, 9);
+            input.value = formatted;
+            // Xato matni yashirish
+            const errEl = document.getElementById('phoneError');
+            if (raw.length === 9) errEl.style.display = 'none';
+        
+            orderState.service = id;
+            document.querySelectorAll("[id^='srv_']").forEach(el=>el.classList.remove("selected"));
+            document.getElementById(`srv_${id}`).classList.add("selected");
+        }
+        function selectPatientType(type){
+            orderState.patient_type = type;
+            document.getElementById("pTypeAdult").classList.toggle("selected", type==='adult');
+            document.getElementById("pTypeChild").classList.toggle("selected", type==='child');
+            renderComplaints(type); renderSlots(type);
+        }
+        function selectGender(g){
+            orderState.patient_gender = g;
+            document.getElementById("genderMale").classList.toggle("selected", g==='male');
+            document.getElementById("genderFemale").classList.toggle("selected", g==='female');
+        }
+        function renderChildTimings(){
+            const t = [
+                {id:'morning',text:'🌅 {% translate "Ertalab" %}'},
+                {id:'day',text:'☀️ {% translate "Kunduzi" %}'},
+                {id:'evening',text:'🌙 {% translate "Kechki payt" %}'},
+                {id:'irregular',text:'🔄 {% translate "Har xil" %}'}
+            ];
+            document.getElementById("childTimingsGrid").innerHTML = t.map(x=>`<button type="button" onclick="selectChildTiming('${x.id}')" id="ct_${x.id}" class="pill">${x.text}</button>`).join('');
+        }
+        function selectChildTiming(id){
+            orderState.child_timing = id;
+            document.querySelectorAll("[id^='ct_']").forEach(el=>el.classList.remove("selected"));
+            document.getElementById(`ct_${id}`).classList.add("selected");
+            renderSlots('child');
+        }
+        function selectDiaper(v){
+            orderState.uses_diaper = v;
+            document.getElementById("diaperYes").classList.toggle("selected", v===true);
+            document.getElementById("diaperNo").classList.toggle("selected", v===false);
+        }
+        function renderComplaints(type){
+            const list = ["Ich qotishi","Ich ketishi","Qorin dam","Qorin og'rig'i","Ko'ngil aynishi","Allergiya","Parazit gumoni"];
+            document.getElementById("complaintsBox").innerHTML = list.map(c=>`
+                <label class="checkbox-card">
+                    <input type="checkbox" value="${c}" onchange="toggleComplaint(this)">
+                    <span>${type==='child'?'👶':'🧑'} ${c}</span>
+                </label>`).join('');
+        }
+        function toggleComplaint(cb){
+            if (cb.checked) orderState.complaints.push(cb.value);
+            else orderState.complaints = orderState.complaints.filter(v=>v!==cb.value);
+        }
+        function renderSlots(type){
+            let slots = [];
+            if (type==='adult') slots = ['18:00 — 22:00'];
+            else if (orderState.child_timing==='morning') slots = ['07:00 — 10:00'];
+            else if (orderState.child_timing==='day') slots = ['12:00 — 15:00','15:00 — 18:00'];
+            else if (orderState.child_timing==='evening') slots = ['15:00 — 18:00','18:00 — 20:00'];
+            else slots = ['Telefon orqali kelishiladi'];
+            document.getElementById("slotsBox").innerHTML = slots.map(s=>`<div onclick="selectSlot('${s}')" id="slot_${s}" class="tile text-center">${s}</div>`).join('');
+        }
+        function selectSlot(s){
+            orderState.pickup_slot = s;
+            document.querySelectorAll("[id^='slot_']").forEach(el=>el.classList.remove("selected"));
+            document.getElementById(`slot_${s}`).classList.add("selected");
+        }
+        function onDistrictChange(){
+            const id = document.getElementById("districtSelect").value;
+            const d = districtsData.find(x=>x.id==id);
+            if (d && d.latitude && d.longitude){
+                map.setView([d.latitude,d.longitude],13);
+                marker.setLatLng([d.latitude,d.longitude]);
+                orderState.latitude = d.latitude; orderState.longitude = d.longitude;
+            }
+            if (d && !isDistrictServed(d)){
+                setLocResult(`<div class="alert alert-err"><b>${d.name}</b> tumanida xizmat ko'rsatilmaydi 😔</div>`);
+            } else if (d){
+                setLocResult(`<div class="alert alert-ok">✅ <b>${d.name}</b> — yetkazish ${parseFloat(d.delivery_price).toLocaleString()} so'm</div>`);
+            }
+        }
+        function selectPayMethod(m){
+            orderState.payment_method = m;
+            document.getElementById("methodTpay").classList.toggle("selected", m==='tpay');
+            document.getElementById("methodAdmin").classList.toggle("selected", m==='admin');
+            document.getElementById("adminScreenshotBlock").classList.toggle("hidden", m!=='admin');
+        }
+        function fillSummary(){
+            const srv = servicesData.find(s=>s.id==orderState.service);
+            const dst = districtsData.find(d=>d.id==orderState.district);
+            const sP = srv?parseFloat(srv.price):0;
+            const dP = dst?parseFloat(dst.delivery_price):0;
+            
+            const localizedServiceName = srv ? (srv[`name_${currentLang}`] || srv.name_uz) : '';
+            document.getElementById("summaryService").innerText = localizedServiceName;
+            document.getElementById("summaryPatient").innerText = `${orderState.patient_name}, ${orderState.patient_age}`;
+            document.getElementById("summaryTime").innerText = orderState.pickup_slot;
+            document.getElementById("summaryDelivery").innerText = `${dP.toLocaleString()} so'm`;
+            document.getElementById("summaryTotal").innerText = `${(sP+dP).toLocaleString()} so'm`;
+        }
+        
+        function submitOrderAndPay(){
+            orderState.custom_complaint = document.getElementById("customComplaint").value;
+            const fd = new FormData();
+            
+            // Django POST so'rovi uchun CSRF tokeni qo'shish majburiy
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            fd.append('csrfmiddlewaretoken', csrfToken);
+
+            for (const [k,v] of Object.entries(orderState)){
+                if (v===null||v===undefined) continue;
+                if (k==='complaints') fd.append(k, JSON.stringify(v));
+                else fd.append(k, v);
+            }
+            if (orderState.payment_method==='admin'){
+                const fi = document.getElementById("paymentScreenshot");
+                if (fi.files.length>0) fd.append('screenshot', fi.files[0]);
+            }
+            
+            
+            fetch("/api/orders/", {method:'POST', body:fd})
+                .then(r=>r.json()).then(data=>{
+                    if (data.success){
+                        if (data.payment_method==='tpay' && data.pay_url) window.location.href = data.pay_url;
+                        else { alert("{% translate 'Buyurtma qabul qilindi' %}"); window.Telegram?.WebApp?.close(); }
+                    } else alert("Xatolik: " + JSON.stringify(data));
+                }).catch(()=>alert("Server bilan ulanishda xatolik"));
+        }
+    </script>
+</body>
+</html>

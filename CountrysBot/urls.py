@@ -15,6 +15,7 @@ urlpatterns = (
     )
     + [
         path("", include("apps.shared.urls")),
+        path("api/", include("apps.Bot.urls")),
         path("ckeditor5/", include("django_ckeditor_5.urls")),
         path("rosetta/", include("rosetta.urls")),
         path('summernote/', include('django_summernote.urls')),
