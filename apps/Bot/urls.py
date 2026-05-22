@@ -28,7 +28,9 @@ urlpatterns = [
     path('courier/orders', CourierOrderViewSet.as_view({'get': 'list'}), name='courier-orders'),
     path('courier/orders/<int:pk>/done', CourierOrderViewSet.as_view({'post': 'mark_as_done'}), name='courier-order-done'),
 
-
+    path('orders/<int:pk>/confirm_payment/', 
+        OrderViewSet.as_view({'post': 'confirm_payment'}), 
+        name='order-confirm-payment'),
 
     # 2. Tpay to'lov tizimi muvaffaqiyatli yakunlanganda chaqiriladigan Callback URL
     # (Tpay serveri to'lov holatini bildirish uchun shu endpointga POST so'rovi yuboradi)

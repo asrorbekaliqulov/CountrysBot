@@ -1,6 +1,6 @@
 import uuid
 import string
-import random
+import os
 from django.db import models
 from django.utils.timezone import now
 from apps.Bot.models.TelegramBot import TelegramUser
@@ -86,3 +86,71 @@ class Payment(models.Model):
 
     class Meta:
         db_table = "payments"
+    
+
+
+def get_result_upload_path(instance, filename):
+    """Natija fayllarini har bir buyurtma uchun maxsus nom bilan papkada saqlash"""
+    ext = filename.split('.')[-1]
+    # Faylni buyurtma ID si bilan chiroyli nomlaymiz
+    new_filename = f"result_order_{instance.order.id}.{ext}"
+    return os.path.join('test_results/', new_filename)
+
+class TestResult(models.Model):
+    """Shifokorlar bot orqali tahlil natijalarini yuborganda saqlovchi model"""
+    RESULT_STATUS_CHOICES = [
+        ('processing', 'Jarayonda / Tekshirilmoqda'),
+        ('ready', 'Natija tayyor (Tasdiqlangan)'),
+        ('sent', 'Mijozga yuborildi')
+    ]
+
+    order = models.OneToOneField(
+        Order, 
+        on_delete=models.CASCADE, 
+        related_name="test_result", 
+        verbose_name="Buyurtma"
+    )
+    
+    # Endi shifokor Django User emas, TelegramUser-ga bog'lanadi
+    doctor = models.ForeignKey(
+        TelegramUser, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name="issued_results",
+        verbose_name="Mas'ul Shifokor (Telegram)"
+    )
+    
+    # Shifokor botga yozma yuboradigan matnli xulosa
+    doctor_conclusion = models.TextField(
+        blank=True, 
+        null=True, 
+        verbose_name="Shifokor xulosasi / Izoh"
+    )
+    
+    # Shifokor botga rasm yoki PDF fayl tashlaganda saqlanadigan joy
+    result_file = models.FileField(
+        upload_to=get_result_upload_path, 
+        blank=True, 
+        null=True, 
+        verbose_name="Natija fayli (PDF/Rasm)"
+    )
+    
+    status = models.CharField(
+        max_length=20, 
+        choices=RESULT_STATUS_CHOICES, 
+        default='processing',
+        verbose_name="Natija holati"
+    )
+    
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Oxirgi o'zgarish vaqti")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Yaratilgan vaqt")
+
+    class Meta:
+        db_table = "test_results"
+        verbose_name = "Tahlil natijasi"
+        verbose_name_plural = "Tahlil natijalari"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Natija #{self.id} (Buyurtma #{self.order.id})"

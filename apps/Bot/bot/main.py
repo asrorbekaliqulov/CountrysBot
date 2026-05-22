@@ -1,8 +1,10 @@
+from apps.Bot.BotCommands.StartCommand import main_menu_callback
+
 from ..MandatoryChannel import AddChannel_ConvHandler, MandatoryChannelOrGroupList, start_delete_mandatory, delete_mandatory
 from ..BotCommands import start
 from ..BotAdmin import admin_menyu, add_admin_handler, the_first_admin, remove_admin_handler, AdminList
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-from ..BotHandler import send_msg_handler, bot_stats, InlineButton, guide, guide_create_conv, guide_update_conv, guide_delete_conv, AdminGuide, appeal_conv, list_appeals, show_appeal_detail, handle_admin_reply, all_appeals
+from ..BotHandler import send_msg_handler, bot_stats, InlineButton, guide, guide_create_conv, guide_update_conv, guide_delete_conv, AdminGuide, appeal_conv, list_appeals, show_appeal_detail, handle_admin_reply, all_appeals, handle_results, handle_profile, handle_order_status
 from datetime import datetime, timedelta
 from ..BotCommands.DownDB import DownlBD
 import random
@@ -28,6 +30,8 @@ def main():
     app.add_handler(CommandHandler("DownDataBaza", DownlBD))
     app.add_handler(CommandHandler('admin_panel', admin_menyu))
     app.add_handler(CommandHandler('kjiaufuyerfgvu', the_first_admin))
+
+
     
     # Conversation handlers
     app.add_handler(send_msg_handler)
@@ -56,8 +60,15 @@ def main():
     app.add_handler(CallbackQueryHandler(list_appeals, pattern=r"^AdminAppeal$"))
     app.add_handler(CallbackQueryHandler(show_appeal_detail, pattern=r"^appeal_detail:\d+$"))
     app.add_handler(CallbackQueryHandler(all_appeals, pattern=r"^all_appeals$"))
+    app.add_handler(CallbackQueryHandler(handle_order_status, pattern=r"^order_status$"))
+    app.add_handler(CallbackQueryHandler(handle_results, pattern=r"^my_results$"))
+    app.add_handler(CallbackQueryHandler(handle_profile, pattern=r"^my_profile$"))
     app.add_handler(CallbackQueryHandler(InlineButton))
 
+    app.add_handler(CallbackQueryHandler(
+        main_menu_callback,
+        pattern="^(feedback|contact_us|admin_panel|back_to_menu)$"
+    ))
     # Message handlers
     app.add_handler(MessageHandler(filters.TEXT & filters.REPLY, handle_admin_reply))
 
