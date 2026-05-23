@@ -8,7 +8,6 @@
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
@@ -21,7 +20,7 @@
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:14px;
-    overscroll-behavior-y: contain;
+    overscroll-behavior-y:contain;
   }
   button{font-family:inherit;cursor:pointer;border:none;background:none}
   input,select,textarea{font-family:inherit;font-size:14px}
@@ -30,43 +29,11 @@
   .header-title{font-size:18px;font-weight:bold;letter-spacing:0.5px}
   .header-subtitle{font-size:12px;opacity:0.9;margin-top:2px}
   
-  /* Mobil qurilmalar uchun mukammal Tab paneli */
-  .nav-tabs{
-    display: table;
-    table-layout: fixed;
-    width: 100%;
-    background: var(--card);
-    border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: 61px;
-    z-index: 99;
-  }
-  .tab-btn{
-    display: table-cell;
-    text-align: center;
-    padding: 8px 2px;
-    color: var(--muted);
-    font-weight: 600;
-    border-bottom: 3px solid transparent;
-    vertical-align: middle;
-  }
-  /* Stiker (emoji) va matnni ketma-ket (tepa-past) joylashtirish */
-  .tab-icon {
-    display: block;
-    font-size: 16px;
-    margin-bottom: 3px;
-  }
-  .tab-text {
-    display: block;
-    font-size: 11px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .tab-btn.active{
-    color: var(--primary);
-    border-bottom-color: var(--primary);
-  }
+  .nav-tabs{display:table;table-layout:fixed;width:100%;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:61px;z-index:99}
+  .tab-btn{display:table-cell;text-align:center;padding:8px 2px;color:var(--muted);font-weight:600;border-bottom:3px solid transparent;vertical-align:middle;cursor:pointer}
+  .tab-icon{display:block;font-size:16px;margin-bottom:3px}
+  .tab-text{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tab-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
 
   .content{padding:12px;max-width:1000px;margin:0 auto;padding-bottom:100px}
   .tab-content{display:none}
@@ -78,12 +45,16 @@
   .text-muted{color:var(--muted)}
   .text-green{color:var(--green)}
   .text-red{color:var(--red)}
+  .mt-1{margin-top:4px} .mt-2{margin-top:8px} .mt-3{margin-top:12px} .mt-4{margin-top:16px}
+  .mb-2{margin-bottom:8px} .mb-3{margin-bottom:12px}
+  .p-4{padding:16px}
   
   .badge{display:inline-block;padding:3px 6px;border-radius:6px;font-size:11px;font-weight:bold;color:#fff;white-space:nowrap}
   .badge-orange{background:var(--orange)}
   .badge-green{background:var(--green)}
   .badge-red{background:var(--red)}
   .badge-blue{background:var(--blue)}
+  .badge-gray{background:#94a3b8}
 
   .grid-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
   @media(min-width:600px){.grid-stats{grid-template-columns:repeat(4,1fr)}}
@@ -104,34 +75,69 @@
   .btn-primary{background:var(--primary);color:#fff}
   .btn-success{background:var(--green);color:#fff}
   .btn-danger{background:var(--red);color:#fff}
+  .btn-secondary{background:#64748b;color:#fff}
   .btn-block{width:100%;display:flex}
-  .btn-sm{padding:4px 8px;min-height:28px;font-size:11px;border-radius:4px}
+  .btn-sm{padding:4px 10px;min-height:28px;font-size:12px;border-radius:6px}
+  .btn:disabled{opacity:0.6;cursor:not-allowed}
+
+  .form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
 
   .editor-toolbar{display:flex;flex-wrap:wrap;gap:6px;background:#f1f5f9;padding:6px;border-radius:8px 8px 0 0;border:1px solid var(--border);border-bottom:none;margin-top:8px}
   .editor-btn{background:#fff;border:1px solid var(--border);padding:4px 10px;border-radius:4px;font-size:12px;font-weight:bold;color:var(--text)}
-  .editor-textarea{border-radius:0 0 8px 8px !important; resize:vertical}
+  .editor-textarea{border-radius:0 0 8px 8px !important;resize:vertical}
 
-  .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.6);z-index:1000;align-items:center;justify-content:center;padding:12px;backdrop-filter:blur(2px)}
-  .modal-box{background:#fff;width:100%;max-width:550px;border-radius:16px;padding:16px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);max-height:85vh;overflow-y:auto;position:relative}
-  .modal-close{position:absolute;top:14px;right:14px;font-size:22px;color:var(--muted);cursor:pointer;line-height:1}
-  .modal-section{border-top:1px solid var(--border);padding-top:12px;margin-top:12px}
+  /* ── MODAL ── */
+  .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.65);z-index:1000;align-items:flex-end;justify-content:center;padding:0;backdrop-filter:blur(3px)}
+  .modal-box{background:#fff;width:100%;max-width:600px;border-radius:20px 20px 0 0;padding:0;box-shadow:0 -4px 32px rgba(0,0,0,0.15);max-height:92vh;overflow-y:auto;position:relative;animation:slideUp 0.3s ease-out}
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .modal-handle{width:40px;height:4px;background:#e2e8f0;border-radius:2px;margin:12px auto 0}
+  .modal-header{padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .modal-title-text{font-size:17px;font-weight:700;line-height:1.3}
+  .modal-close{font-size:24px;color:var(--muted);cursor:pointer;line-height:1;flex-shrink:0;padding:0 4px}
+  .modal-body{padding:16px 20px 24px}
+  .modal-section{border-top:1px solid var(--border);padding-top:14px;margin-top:14px}
+  .modal-section-title{font-weight:700;font-size:13px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
 
-  #map-container{height:220px;border-radius:12px;overflow:hidden;margin-top:8px;border:1px solid var(--border);display:none}
+  /* ── Info grid ── */
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px}
+  .info-cell{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+  .info-label{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:2px}
+  .info-value{font-size:13px;font-weight:600}
+
+  /* ── Payment section ── */
+  .payment-box{background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:12px}
+  .payment-box.pending{background:#fffbeb;border-color:#fde68a}
+  .payment-box.failed{background:#fef2f2;border-color:#fecaca}
+  .payment-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(0,0,0,0.05);font-size:13px}
+  .payment-row:last-child{border-bottom:none}
+  .payment-row .label{color:var(--muted);font-weight:600}
+  .payment-row .value{font-weight:700;text-align:right}
+
+  /* ── Screenshot ── */
+  .screenshot-toggle-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;background:#eff6ff;border:1.5px solid #bfdbfe;color:#1d4ed8;font-weight:700;font-size:12px;width:100%;justify-content:center;margin-top:10px;transition:all 0.2s}
+  .screenshot-toggle-btn:active{transform:scale(0.98)}
+  .screenshot-wrap{margin-top:10px;border-radius:10px;overflow:hidden;border:2px dashed var(--border)}
+  .screenshot-img{width:100%;max-height:400px;object-fit:contain;display:block;background:#f8fafc}
+
+  /* ── Address block ── */
+  .address-block{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;line-height:1.5}
+
+  /* ── Map ── */
+  #map-container{height:220px;border-radius:10px;overflow:hidden;margin-top:8px;border:1px solid var(--border);display:none}
   #map{height:100%}
-  .screenshot-img{width:100%; max-height:350px; object-fit:contain; border-radius:8px; margin-top:8px; border:2px dashed var(--border); background:#f8fafc; display:block}
 
-  .form-grid-2{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px}
+  /* ── Toast ── */
+  #admin-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 20px;border-radius:12px;font-weight:600;font-size:13px;color:#fff;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.18);transition:opacity 0.3s;max-width:90vw;text-align:center;pointer-events:none}
 
   @media(max-width:480px){
     body{font-size:13px}
     .header-title{font-size:16px}
-    .tab-text { font-size: 10px; }
-    .tab-icon { font-size: 14px; }
+    .tab-text{font-size:10px}
+    .tab-icon{font-size:14px}
     .card{padding:12px;margin-bottom:10px}
-    .stat-val{font-size:13px}
-    .btn{font-size:12px;padding:8px 10px}
+    .info-grid{grid-template-columns:1fr}
     .form-grid-2{grid-template-columns:1fr}
-    .district-split-grid { grid-template-columns: 1fr !important; gap: 10px; }
+    .district-split-grid{grid-template-columns:1fr !important;gap:10px}
   }
 </style>
 </head>
@@ -164,73 +170,72 @@
 </div>
 
 <div class="content">
-  
+
+  <!-- DASHBOARD -->
   <div id="tab-dashboard" class="tab-content active">
     <div class="grid-stats">
-      <div class="stat-box"><div class="text-muted text-sm">Jami Buyurtmalar</div><div class="stat-val" id="st-total-orders">0</div></div>
-      <div class="stat-box"><div class="text-muted text-sm">Kassa (Daromad)</div><div class="stat-val text-green" id="st-revenue">0</div></div>
-      <div class="stat-box"><div class="text-muted text-sm">Kutilmoqda</div><div class="stat-val text-red" id="st-pending">0</div></div>
-      <div class="stat-box"><div class="text-muted text-sm">Foydalanuvchilar</div><div class="stat-val" id="st-users">0</div></div>
+      <div class="stat-box"><div class="text-muted text-sm">Jami Buyurtmalar</div><div class="stat-val" id="st-total-orders">—</div></div>
+      <div class="stat-box"><div class="text-muted text-sm">Kassa (Daromad)</div><div class="stat-val text-green" id="st-revenue">—</div></div>
+      <div class="stat-box"><div class="text-muted text-sm">Kutilmoqda</div><div class="stat-val text-red" id="st-pending">—</div></div>
+      <div class="stat-box"><div class="text-muted text-sm">Foydalanuvchilar</div><div class="stat-val" id="st-users">—</div></div>
     </div>
-
     <div class="card" style="padding:12px">
-      <div class="font-semibold mb-2" style="font-size:14px;">📋 Buyurtmalar Ro'yxati</div>
+      <div class="font-semibold mb-2" style="font-size:14px">📋 Buyurtmalar Ro'yxati</div>
       <div id="orders-list-container" class="table-responsive">
-        <div class="p-4 text-muted text-center">Buyurtmalar yuklanmoqda...</div>
+        <div class="p-4 text-muted" style="text-align:center">Buyurtmalar yuklanmoqda...</div>
       </div>
     </div>
   </div>
 
+  <!-- SERVICES -->
   <div id="tab-services" class="tab-content">
     <div class="card">
-      <div class="font-semibold mb-2" style="font-size:14px;">➕ Yangi Xizmat/Tahlil Qo'shish</div>
+      <div class="font-semibold mb-2" style="font-size:14px">➕ Yangi Xizmat/Tahlil Qo'shish</div>
       <div class="form-grid-2">
         <input type="text" class="input" id="new-service-name" placeholder="Xizmat nomi (UZ)" />
         <input type="number" class="input" id="new-service-price" placeholder="Narxi (so'mda)" />
       </div>
       <button class="btn btn-success btn-block" onclick="createNewService()">🚀 Xizmatni Qo'shish</button>
     </div>
-
     <div class="card" style="padding:12px">
-      <div class="font-semibold mb-2" style="font-size:14px;">🩺 Mavjud Xizmatlar va Narxlar</div>
+      <div class="font-semibold mb-2" style="font-size:14px">🩺 Mavjud Xizmatlar va Narxlar</div>
       <div id="services-list-container" class="table-responsive">
-        <div class="p-4 text-muted text-center">Yuklanmoqda...</div>
+        <div class="p-4 text-muted" style="text-align:center">Yuklanmoqda...</div>
       </div>
     </div>
   </div>
 
+  <!-- DISTRICTS -->
   <div id="tab-districts" class="tab-content">
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;" class="district-split-grid">
-      
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" class="district-split-grid">
       <div class="card" style="margin-bottom:0">
-        <div class="font-semibold mb-2" style="font-size:14px;">➕ Tuman Qo'shish</div>
+        <div class="font-semibold mb-2" style="font-size:14px">➕ Tuman Qo'shish</div>
         <input type="text" class="input" id="new-district-name" placeholder="Tuman nomi (Chilonzor)" style="margin-bottom:8px"/>
         <label class="text-sm text-muted">Tegishli viloyatni tanlang:</label>
-        <select class="select" id="new-district-region" style="margin-bottom:8px; margin-top:4px;">
+        <select class="select" id="new-district-region" style="margin-bottom:8px;margin-top:4px">
           <option value="">-- Viloyatni tanlang --</option>
         </select>
         <button class="btn btn-success btn-block" onclick="createNewDistrict()">📍 Tumanni Qo'shish</button>
       </div>
-
-      <div class="card" style="margin-bottom:0; background: #fdfdfd">
-        <div class="font-semibold mb-2" style="font-size:14px; color: var(--primary)">➕ Yangi Viloyat Qo'shish</div>
-        <p class="text-muted text-sm" style="margin: 0 0 8px 0">Agar tuman viloyati ro'yxatda bo'lmasa, oldin viloyatni qo'shing:</p>
-        <input type="text" class="input" id="new-region-name" placeholder="Viloyat nomi (Toshkent sh.)" style="margin-bottom:8px" />
+      <div class="card" style="margin-bottom:0;background:#fdfdfd">
+        <div class="font-semibold mb-2" style="font-size:14px;color:var(--primary)">➕ Yangi Viloyat Qo'shish</div>
+        <p class="text-muted text-sm" style="margin:0 0 8px">Agar tuman viloyati ro'yxatda bo'lmasa, oldin viloyatni qo'shing:</p>
+        <input type="text" class="input" id="new-region-name" placeholder="Viloyat nomi (Toshkent sh.)" style="margin-bottom:8px"/>
         <button class="btn btn-primary btn-block" onclick="createNewRegion()">🗺️ Viloyatni Qo'shish</button>
       </div>
     </div>
-
-    <div class="card" style="padding:12px; margin-top:14px">
-      <div class="font-semibold mb-2" style="font-size:14px;">🗺️ Tizimdagi Mavjud Tumanlar</div>
+    <div class="card" style="padding:12px;margin-top:14px">
+      <div class="font-semibold mb-2" style="font-size:14px">🗺️ Tizimdagi Mavjud Tumanlar</div>
       <div id="districts-list-container" class="table-responsive">
-        <div class="p-4 text-muted text-center">Tumanlar yuklanmoqda...</div>
+        <div class="p-4 text-muted" style="text-align:center">Tumanlar yuklanmoqda...</div>
       </div>
     </div>
   </div>
 
+  <!-- STAFF -->
   <div id="tab-staff" class="tab-content">
     <div class="card">
-      <div class="font-semibold mb-2" style="font-size:14px;">➕ Yangi Xodim (Admin/Kuryer/Doctor) Qo'shish</div>
+      <div class="font-semibold mb-2" style="font-size:14px">➕ Yangi Xodim Qo'shish</div>
       <div class="form-grid-2">
         <input type="number" class="input" id="staff-tg-id" placeholder="Telegram User ID (Majburiy)" />
         <input type="text" class="input" id="staff-name" placeholder="Xodim ismi/FIO" />
@@ -243,31 +248,30 @@
         </select>
         <input type="text" class="input" id="staff-phone" placeholder="Telefon raqami" />
       </div>
-      
-      <div id="staff-district-block" style="margin-top: 8px; margin-bottom: 8px;">
+      <div id="staff-district-block" style="margin-top:8px;margin-bottom:8px">
         <label class="text-sm text-muted">Kuryer biriktiriladigan asosiy tuman:</label>
-        <select class="select" id="staff-district" style="margin-top: 4px;">
-          <option value="">-- Tumanni tanlang (Majburiy emas) --</option>
+        <select class="select" id="staff-district" style="margin-top:4px">
+          <option value="">-- Tumanni tanlang --</option>
         </select>
       </div>
-
       <button class="btn btn-success btn-block" onclick="createNewStaff()">👥 Xodimni Bazaga Qo'shish</button>
     </div>
-
     <div class="card" style="padding:12px">
-      <div class="font-semibold mb-2" style="font-size:14px;">👥 Ro'yxatdan o'tgan Xodimlar</div>
+      <div class="font-semibold mb-2" style="font-size:14px">👥 Ro'yxatdan o'tgan Xodimlar</div>
       <div id="staff-list-container" class="table-responsive">
-        <div class="p-4 text-muted text-center">Xodimlar yuklanmoqda...</div>
+        <div class="p-4 text-muted" style="text-align:center">Xodimlar yuklanmoqda...</div>
       </div>
     </div>
   </div>
 
+  <!-- BROADCAST -->
   <div id="tab-broadcast" class="tab-content"></div>
 
+  <!-- SETTINGS -->
   <div id="tab-settings" class="tab-content">
     <div class="card">
       <div class="font-semibold mb-3">⚙️ Global Bot Sozlamalari</div>
-      <div style="display:flex; flex-direction:column; gap:12px">
+      <div style="display:flex;flex-direction:column;gap:12px">
         <div>
           <label class="text-sm text-muted">Kuryer yetkazib berish narxi (so'm):</label>
           <input type="number" class="input mt-1" id="set-delivery-fee" />
@@ -282,77 +286,138 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="orderModal" onclick="if(event.target===this) closeOrderModal()">
+<!-- ══════════════════════════════════════════════
+     ORDER DETAIL MODAL — TO'LIQ QAYTA YOZILGAN
+     ══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="orderModal" onclick="if(event.target===this)closeOrderModal()">
   <div class="modal-box">
-    <span class="modal-close" onclick="closeOrderModal()">&times;</span>
-    <h3 style="margin-top:0; margin-bottom:8px; font-size:16px" id="m-title">Buyurtma Tafsilotlari</h3>
-    
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:13px; margin-bottom:12px;" class="form-grid-2">
-      <div><span class="text-muted">Bemor:</span> <b id="m-patient"></b></div>
-      <div><span class="text-muted">Turi:</span> <b id="m-type"></b></div>
-      <div><span class="text-muted">Tahlil:</span> <b id="m-service"></b></div>
-      <div><span class="text-muted">Summa:</span> <b id="m-price" class="text-green"></b></div>
-      <div><span class="text-muted">Tuman:</span> <span class="badge badge-orange" id="m-district"></span></div>
-      <div><span class="text-muted">Sana:</span> <span id="m-date" class="text-muted"></span></div>
-    </div>
-    
-    <div><span class="text-muted">Manzil izohi:</span> <div id="m-address" style="background:#f8fafc; padding:8px; border-radius:6px; margin-top:4px; font-size:13px"></div></div>
-    
-    <div id="m-location-section" style="margin-top:8px; display:none;">
-      <button class="btn btn-primary btn-sm" onclick="toggleMapInModal()">📍 Xaritada ko'rish</button>
-      <div id="map-container"><div id="map"></div></div>
+    <div class="modal-handle"></div>
+
+    <!-- Modal header -->
+    <div class="modal-header">
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.5px" id="m-order-id-label">ZAKAZ</div>
+        <div class="modal-title-text" id="m-patient-title">—</div>
+      </div>
+      <span class="modal-close" onclick="closeOrderModal()">×</span>
     </div>
 
-    <div class="modal-section" id="m-screenshot-section">
-      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-        <span class="font-semibold text-sm">💳 To'lov Ma'lumotlari</span>
-        <span id="m-payment-status-badge"></span>
-      </div>
-      <div id="m-payment-info" style="background:#f8fafc; border-radius:8px; padding:10px; font-size:13px; display:grid; grid-template-columns:1fr 1fr; gap:6px; border:1px solid var(--border); margin-bottom:8px;">
-        <div><span class="text-muted">Usul:</span> <b id="m-pay-method">—</b></div>
-        <div><span class="text-muted">Holat:</span> <b id="m-pay-status">—</b></div>
-        <div><span class="text-muted">Tranzaksiya:</span> <small id="m-pay-txn" class="text-muted">—</small></div>
-        <div><span class="text-muted">Sana:</span> <small id="m-pay-date" class="text-muted">—</small></div>
-      </div>
-      <button class="btn btn-primary btn-sm" id="btn-toggle-screenshot" style="margin-top:5px;" onclick="toggleScreenshotImg()">🖼️ Skrinshotni ko'rish</button>
-      <div id="screenshot-container" style="display:none;">
-        <img src="" id="m-screenshot-img" class="screenshot-img" alt="Chek mavjud emas" onerror="this.src='https://placehold.co/400x250/f1f5f9/64748b?text=Rasm+Mavjud+Emas'"/>
-      </div>
-    </div>
+    <!-- Modal body -->
+    <div class="modal-body">
 
-    <div class="modal-section">
-      <div class="font-semibold mb-2">⚡ Buyurtma Holati</div>
-      <div style="display:flex; gap:8px; align-items:center;">
+      <!-- Asosiy ma'lumotlar -->
+      <div class="info-grid" id="m-info-grid">
+        <div class="info-cell"><div class="info-label">Tur</div><div class="info-value" id="m-type">—</div></div>
+        <div class="info-cell"><div class="info-label">Xizmat</div><div class="info-value" id="m-service">—</div></div>
+        <div class="info-cell"><div class="info-label">Summa</div><div class="info-value text-green" id="m-price">—</div></div>
+        <div class="info-cell"><div class="info-label">Tuman</div><div class="info-value" id="m-district">—</div></div>
+        <div class="info-cell"><div class="info-label">Sana</div><div class="info-value" id="m-date">—</div></div>
+        <div class="info-cell"><div class="info-label">Holat</div><div class="info-value" id="m-status-badge-cell">—</div></div>
+      </div>
+
+      <!-- Manzil -->
+      <div style="margin-top:10px">
+        <div class="info-label" style="margin-bottom:4px">📍 Manzil izohi</div>
+        <div class="address-block" id="m-address">—</div>
+      </div>
+
+      <!-- Xarita -->
+      <div id="m-location-section" style="display:none;margin-top:10px">
+        <button class="btn btn-primary btn-sm" onclick="toggleMapInModal()">📍 Xaritada ko'rish</button>
+        <div id="map-container"><div id="map"></div></div>
+      </div>
+
+      <!-- ══ TO'LOV BO'LIMI ══ -->
+      <div class="modal-section">
+        <div class="modal-section-title">💳 To'lov Ma'lumotlari</div>
+
+        <!-- To'lov holati qutisi -->
+        <div class="payment-box" id="m-payment-box">
+          <div class="payment-row">
+            <span class="label">To'lov usuli</span>
+            <span class="value" id="m-pay-method">—</span>
+          </div>
+          <div class="payment-row">
+            <span class="label">Holati</span>
+            <span class="value" id="m-pay-status-text">—</span>
+          </div>
+          <div class="payment-row" id="m-txn-row">
+            <span class="label">Tranzaksiya ID</span>
+            <span class="value" style="font-size:11px;word-break:break-all" id="m-pay-txn">—</span>
+          </div>
+          <div class="payment-row" id="m-card-row">
+            <span class="label">Karta</span>
+            <span class="value" id="m-pay-card">—</span>
+          </div>
+          <div class="payment-row">
+            <span class="label">To'lov sanasi</span>
+            <span class="value" id="m-pay-date">—</span>
+          </div>
+          <div class="payment-row">
+            <span class="label">To'langan summa</span>
+            <span class="value text-green" id="m-pay-amount">—</span>
+          </div>
+        </div>
+
+        <!-- Screenshot tugmasi va rasmi -->
+        <div id="m-screenshot-section">
+          <button class="screenshot-toggle-btn" id="btn-toggle-screenshot" onclick="toggleScreenshotImg()">
+            🖼️ To'lov chekini ko'rish
+          </button>
+          <div id="screenshot-container" class="screenshot-wrap" style="display:none">
+            <img src="" id="m-screenshot-img" class="screenshot-img" alt="Chek rasm"
+                 onerror="this.src='https://placehold.co/600x300/f1f5f9/94a3b8?text=Rasm+Yuklanmagan'"/>
+          </div>
+        </div>
+
+        <!-- Admin tasdiqlash tugmasi -->
+        <div id="m-confirm-section" style="display:none;margin-top:12px">
+          <button class="btn btn-success btn-block" id="m-btn-confirm-payment" onclick="approveAdminPayment()">
+            ✅ To'lovni Tasdiqlash va Kuryerga Yuborish
+          </button>
+        </div>
+      </div>
+
+      <!-- ══ STATUS O'ZGARTIRISH ══ -->
+      <div class="modal-section">
+        <div class="modal-section-title">⚡ Buyurtma Holatini O'zgartirish</div>
         <select class="select" id="m-status-select">
           <option value="pending">⏳ Kutilmoqda</option>
           <option value="paid">💳 To'langan</option>
           <option value="delivering">🚚 Yo'lda</option>
           <option value="done">✅ Yetkazildi</option>
-          <option value="result_pending">Natija kutilmoqda 🧪</option>
-          <option value="result_sent">Natija jo'natildi ✉️</option>
+          <option value="result_pending">🧪 Natija kutilmoqda</option>
+          <option value="result_sent">✉️ Natija jo'natildi</option>
           <option value="canceled">❌ Bekor qilindi</option>
         </select>
-        <button class="btn btn-success" id="m-btn-confirm-payment" onclick="approveAdminPayment(currentActiveOrder?.id)">✅ To'lovni Tasdiqlash</button>
       </div>
-    </div>
 
-    <div class="modal-section">
-      <div class="font-semibold mb-2">🧫 Natija va Shifokor Xulosasi</div>
-      <textarea class="textarea mb-2" id="m-conclusion" placeholder="Xulosani yozing..." rows="2" style="width:100%; border-radius:8px; padding:8px; border:1px solid var(--border)"></textarea>
-      <input type="file" id="m-file" accept="image/*,application/pdf" class="input" />
-      <div id="m-has-result-badge" class="text-green text-sm font-semibold mt-2" style="display:none;">✅ Natija fayli yuklangan.</div>
-    </div>
+      <!-- ══ NATIJA YUKASH ══ -->
+      <div class="modal-section">
+        <div class="modal-section-title">🧫 Natija va Shifokor Xulosasi</div>
+        <textarea class="textarea mb-2" id="m-conclusion" placeholder="Xulosani yozing..." rows="2"
+          style="width:100%;border-radius:8px;padding:8px;border:1px solid var(--border);resize:vertical"></textarea>
+        <input type="file" id="m-file" accept="image/*,application/pdf" class="input" />
+        <div id="m-has-result-badge" style="display:none;color:var(--green);font-size:12px;font-weight:700;margin-top:6px">
+          ✅ Natija fayli avval yuklangan.
+        </div>
+      </div>
 
-    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
-      <button class="btn btn-danger" style="background:#64748b" onclick="closeOrderModal()">Yopish</button>
-      <button class="btn btn-primary" onclick="saveModalOrder()">💾 Saqlash</button>
+      <!-- Tugmalar -->
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+        <button class="btn btn-secondary" onclick="closeOrderModal()">Yopish</button>
+        <button class="btn btn-primary" onclick="saveModalOrder()">💾 Saqlash</button>
+      </div>
     </div>
   </div>
 </div>
 
+<!-- Toast -->
+<div id="admin-toast" style="display:none"></div>
+
 <script>
 const tg = window.Telegram?.WebApp;
-if(tg) { tg.ready(); tg.expand(); tg.isClosingConfirmationEnabled = true; }
+if(tg){ tg.ready(); tg.expand(); tg.isClosingConfirmationEnabled = true; }
 
 const TG_ID = tg?.initDataUnsafe?.user?.id || "6194484795";
 const FIRST_NAME = tg?.initDataUnsafe?.user?.first_name || "Admin";
@@ -365,267 +430,336 @@ let regionsData = [];
 let staffData = [];
 let currentActiveOrder = null;
 
+// ── YORDAMCHI ────────────────────────────────────────────────────────────────
 async function api(url, options={}) {
   try {
     const r = await fetch(url, options);
-    if (!r.ok) throw new Error('Tarmoq xatoligi');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return await r.json();
-  } catch(e) { console.error(e); return null; }
+  } catch(e) { console.error('[API xatosi]', url, e); return null; }
 }
 
-function toggleStaffDistrictSelect() {
-  const role = document.getElementById('staff-role').value;
-  const block = document.getElementById('staff-district-block');
-  if (role === 'courier') { block.style.display = 'block'; } 
-  else { block.style.display = 'none'; document.getElementById('staff-district').value = ""; }
+function esc(str) {
+  if (!str && str !== 0) return '—';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// ── TAB ──────────────────────────────────────────────────────────────────────
 function switchTab(tabId) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  
-  const currentBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.textContent.toLowerCase().includes(
-    tabId==='dashboard'?'buyurtma':tabId==='services'?'xizmat':tabId==='districts'?'tuman':tabId==='staff'?'xodim':tabId==='broadcast'?'reklama':'sozlamalar'
-  ));
-  if(currentBtn) currentBtn.classList.add('active');
-  
-  const contentEl = document.getElementById(`tab-${tabId}`);
-  if(contentEl) contentEl.classList.add('active');
 
-  if (tabId === 'dashboard') { loadStats(); loadOrders(); }
-  if (tabId === 'services') loadServices();
-  if (tabId === 'districts') { loadRegions(); loadDistricts(); }
-  if (tabId === 'staff') loadStaff();
-  if (tabId === 'broadcast') renderBroadcast();
-  if (tabId === 'settings') loadSettings();
+  // Tab button ni topamiz
+  const tabLabels = { dashboard:'buyurtma', services:'xizmat', districts:'tuman', staff:'xodim', broadcast:'reklama', settings:'sozlamalar' };
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    if (btn.querySelector('.tab-text')?.textContent.toLowerCase().includes(tabLabels[tabId])) {
+      btn.classList.add('active');
+    }
+  });
+
+  const el = document.getElementById(`tab-${tabId}`);
+  if (el) el.classList.add('active');
+
+  if (tabId === 'dashboard')  { loadStats(); loadOrders(); }
+  if (tabId === 'services')   loadServices();
+  if (tabId === 'districts')  { loadRegions(); loadDistricts(); }
+  if (tabId === 'staff')      loadStaff();
+  if (tabId === 'broadcast')  renderBroadcast();
+  if (tabId === 'settings')   loadSettings();
 }
 
+// ── STATS ────────────────────────────────────────────────────────────────────
 async function loadStats() {
   const data = await api(`/api/admin/stats/?tg_id=${TG_ID}`);
-  if (data) {
-    document.getElementById('st-total-orders').textContent = data.total_orders || 0;
-    document.getElementById('st-revenue').textContent = (data.total_revenue || 0).toLocaleString() + " so'm";
-    document.getElementById('st-users').textContent = data.total_users || 0;
-    document.getElementById('st-pending').textContent = data.pending_orders || 0;
-  }
+  if (!data) return;
+  document.getElementById('st-total-orders').textContent = data.total_orders ?? 0;
+  document.getElementById('st-revenue').textContent = (data.total_revenue ?? 0).toLocaleString() + " so'm";
+  document.getElementById('st-users').textContent = data.total_users ?? 0;
+  document.getElementById('st-pending').textContent = data.pending_orders ?? 0;
 }
 
+// ── ORDERS LIST ───────────────────────────────────────────────────────────────
 async function loadOrders() {
   const el = document.getElementById('orders-list-container');
+  el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">Yuklanmoqda...</div>';
+
   ordersData = await api(`/api/admin/orders/?tg_id=${TG_ID}`) || [];
-  if (ordersData.length === 0) { el.innerHTML = '<div class="p-4 text-muted text-center">Buyurtmalar topilmadi.</div>'; return; }
-
-  let html = `<table class="table"><thead><tr><th>ID</th><th>Bemor</th><th>Xizmat / Summa</th><th>Tuman</th><th>Holat</th><th>To'lov</th></tr></thead><tbody>`;
-  ordersData.forEach(o => {
-    const statusMap = {
-      pending:        '<span class="badge badge-red">⏳ Kutilmoqda</span>',
-      paid:           '<span class="badge badge-green">💳 To\'langan</span>',
-      delivering:     '<span class="badge badge-blue">🚚 Yo\'lda</span>',
-      done:           '<span class="badge badge-green" style="background:#059669">✅ Yetkazildi</span>',
-      result_pending: '<span class="badge" style="background:#d97706">🧪 Natija kutilmoqda</span>',
-      result_sent:    '<span class="badge badge-green" style="background:#0891b2">✉️ Natija yuborildi</span>',
-      canceled:       '<span class="badge" style="background:#94a3b8">❌ Bekor</span>',
-    };
-    const payMap = {
-      success: '<span class="badge badge-green" style="font-size:10px">✅ To\'landi</span>',
-      pending: '<span class="badge badge-orange" style="font-size:10px">⏳ Kutilmoqda</span>',
-      failed:  '<span class="badge badge-red" style="font-size:10px">❌ Xato</span>',
-    };
-    const statusBadge = statusMap[o.status] || `<span class="badge" style="background:#94a3b8">${o.status}</span>`;
-    const payStatus   = o.payment?.status || (o.status === 'paid' ? 'success' : 'pending');
-    const payBadge    = payMap[payStatus] || '';
-
-    html += `<tr onclick="openOrderModal(${o.id})">
-        <td><b>#${o.id}</b></td>
-        <td><b>${o.patient_name || '—'}</b><br><small class="text-muted">${o.patient_type === 'child' ? '👶 Bola' : '👤 Katta'}</small></td>
-        <td>${o.service_name || '—'}<br><b>${(o.total_price || 0).toLocaleString()} s.</b></td>
-        <td><span class="badge badge-orange">${o.district_name || 'Noma\'lum'}</span></td>
-        <td>${statusBadge}</td>
-        <td>${payBadge}</td>
-      </tr>`;
-  });
-  el.innerHTML = html + `</tbody></table>`;
-}
-
-function openOrderModal(orderId) {
-  // orderId undefined/null bo'lsa chiqib ketamiz
-  if (!orderId || orderId === 'undefined') {
-    console.error('openOrderModal: orderId noto\'g\'ri:', orderId);
+  if (!ordersData.length) {
+    el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">Buyurtmalar topilmadi.</div>';
     return;
   }
 
-  const order = ordersData.find(x => x.id === orderId || String(x.id) === String(orderId));
+  const statusMap = {
+    pending:        '<span class="badge badge-red">⏳ Kutilmoqda</span>',
+    paid:           '<span class="badge badge-green">💳 To\'langan</span>',
+    delivering:     '<span class="badge badge-blue">🚚 Yo\'lda</span>',
+    done:           '<span class="badge badge-green" style="background:#059669">✅ Yetkazildi</span>',
+    result_pending: '<span class="badge" style="background:#d97706">🧪 Natija kutilmoqda</span>',
+    result_sent:    '<span class="badge" style="background:#0891b2">✉️ Natija yuborildi</span>',
+    canceled:       '<span class="badge badge-gray">❌ Bekor</span>',
+  };
+  const payMap = {
+    success: '<span class="badge badge-green" style="font-size:10px">✅ To\'landi</span>',
+    pending: '<span class="badge badge-orange" style="font-size:10px">⏳ Kutilmoqda</span>',
+    failed:  '<span class="badge badge-red" style="font-size:10px">❌ Xato</span>',
+  };
+
+  let html = `<table class="table"><thead><tr>
+    <th>ID</th><th>Bemor</th><th>Xizmat / Summa</th><th>Tuman</th><th>Holat</th><th>To'lov</th>
+  </tr></thead><tbody>`;
+
+  ordersData.forEach(o => {
+    const payStatus = o.payment?.status || (o.status === 'paid' ? 'success' : 'pending');
+    html += `<tr onclick="openOrderModal(${o.id})">
+      <td><b>#${o.id}</b></td>
+      <td><b>${esc(o.patient_name)}</b><br><small class="text-muted">${o.patient_type === 'child' ? '👶 Bola' : '👤 Katta'}</small></td>
+      <td>${esc(o.service_name)}<br><b>${(o.total_price||0).toLocaleString()} s.</b></td>
+      <td><span class="badge badge-orange">${esc(o.district_name)}</span></td>
+      <td>${statusMap[o.status] || `<span class="badge badge-gray">${o.status}</span>`}</td>
+      <td>${payMap[payStatus] || ''}</td>
+    </tr>`;
+  });
+
+  el.innerHTML = html + '</tbody></table>';
+}
+
+// ── ORDER MODAL ───────────────────────────────────────────────────────────────
+function openOrderModal(orderId) {
+  const order = ordersData.find(x => String(x.id) === String(orderId));
   if (!order) { console.error('Buyurtma topilmadi:', orderId); return; }
   currentActiveOrder = order;
 
-  document.getElementById('m-title').textContent = `Buyurtma #${order.id} Tafsilotlari`;
-  document.getElementById('m-patient').textContent = order.patient_name || '—';
-  document.getElementById('m-type').textContent = order.patient_type === 'child' ? '👶 Bola' : '👤 Katta';
+  // Header
+  document.getElementById('m-order-id-label').textContent = `ZAKAZ #${order.id}`;
+  document.getElementById('m-patient-title').textContent = order.patient_name || 'Noma\'lum';
+
+  // Info cells
+  document.getElementById('m-type').textContent    = order.patient_type === 'child' ? '👶 Bola' : '👤 Katta';
   document.getElementById('m-service').textContent = order.service_name || '—';
-  document.getElementById('m-price').textContent = (order.total_price || 0).toLocaleString() + " so'm";
-  document.getElementById('m-district').textContent = order.district_name || 'Ko\'rsatilmagan';
-  document.getElementById('m-date').textContent = order.created_at || '';
-  document.getElementById('m-address').textContent = order.address_note || "Izoh qoldirilmagan";
-  document.getElementById('m-status-select').value = order.status;
-  document.getElementById('m-conclusion').value = order.conclusion || "";
-  document.getElementById('m-file').value = "";
+  document.getElementById('m-price').textContent   = (order.total_price || 0).toLocaleString() + " so'm";
+  document.getElementById('m-district').textContent= order.district_name || '—';
+  document.getElementById('m-date').textContent    = order.created_at || '—';
 
-  // ── To'lov ma'lumotlari ──────────────────────────────────────────────────
-  const pay = order.payment || {};
-  const payMethodMap = { admin: '🏦 Admin (qo\'lda)', tpay: '💳 TPay (online)' };
-  const payStatusMap = {
-    pending: '<span style="color:#ea580c">⏳ Kutilmoqda</span>',
-    success: '<span style="color:#16a34a">✅ Tasdiqlangan</span>',
-    failed:  '<span style="color:#dc2626">❌ Muvaffaqiyatsiz</span>',
+  // Status badge in info grid
+  const statusLabels = {
+    pending:'⏳ Kutilmoqda', paid:'💳 To\'langan', delivering:'🚚 Yo\'lda',
+    done:'✅ Yetkazildi', result_pending:'🧪 Natija kutilmoqda',
+    result_sent:'✉️ Natija yuborildi', canceled:'❌ Bekor qilindi'
   };
+  document.getElementById('m-status-badge-cell').textContent = statusLabels[order.status] || order.status;
 
-  document.getElementById('m-pay-method').innerHTML  = payMethodMap[pay.method]  || pay.method  || '—';
-  document.getElementById('m-pay-status').innerHTML  = payStatusMap[pay.status]  || pay.status  || '—';
-  document.getElementById('m-pay-txn').textContent   = pay.transaction_id || '—';
-  document.getElementById('m-pay-date').textContent  = pay.created_at    || '—';
+  // Manzil
+  document.getElementById('m-address').textContent = order.address_note || 'Izoh qoldirilmagan';
 
-  // To'lov holat badge
-  const badgeEl = document.getElementById('m-payment-status-badge');
-  if (pay.status === 'success') {
-    badgeEl.innerHTML = '<span class="badge badge-green">✅ To\'langan</span>';
-  } else if (pay.status === 'failed') {
-    badgeEl.innerHTML = '<span class="badge badge-red">❌ To\'lanmagan</span>';
-  } else if (pay.status === 'pending') {
-    badgeEl.innerHTML = '<span class="badge badge-orange">⏳ Kutilmoqda</span>';
-  } else {
-    badgeEl.innerHTML = '';
-  }
+  // Status select
+  document.getElementById('m-status-select').value = order.status;
 
-  // Screenshot
-  const screenshot = order.screenshot || pay.screenshot || order.screenshot_url || '';
-  document.getElementById('m-screenshot-img').src = screenshot || 'https://placehold.co/400x250/f1f5f9/64748b?text=Chek+Rasm+Yuklanmagan';
-  document.getElementById('screenshot-container').style.display  = 'none';
-  document.getElementById('btn-toggle-screenshot').textContent   = '🖼️ Skrinshotni ko\'rish';
+  // Natija
+  document.getElementById('m-conclusion').value = order.conclusion || '';
+  document.getElementById('m-file').value = '';
+  document.getElementById('m-has-result-badge').style.display = order.has_result ? 'block' : 'none';
 
   // Xarita
-  document.getElementById('m-location-section').style.display = (order.latitude && order.longitude) ? 'block' : 'none';
+  document.getElementById('m-location-section').style.display =
+    (order.latitude && order.longitude) ? 'block' : 'none';
   closeMap();
 
-  // "To'lovni tasdiqlash" tugmasi — faqat pending va admin usulida ko'rinadi
-  const showConfirmBtn = order.status === 'pending' && (!pay.method || pay.method === 'admin') && pay.status !== 'success';
-  document.getElementById('m-btn-confirm-payment').style.display = showConfirmBtn ? 'inline-flex' : 'none';
+  // ── TO'LOV MA'LUMOTLARI (asosiy muammo shu yerda edi) ──
+  fillPaymentSection(order);
 
-  document.getElementById('m-has-result-badge').style.display = order.has_result ? 'block' : 'none';
   document.getElementById('orderModal').style.display = 'flex';
 }
 
-function closeOrderModal() { document.getElementById('orderModal').style.display = 'none'; currentActiveOrder = null; }
+function fillPaymentSection(order) {
+  const pay = order.payment || {};
+
+  // To'lov usuli — chiroyli ko'rinish
+  const methodLabels = { admin: '🏦 Admin (qo\'lda)', tpay: '💳 TPay (online)', card: '💳 Karta' };
+  document.getElementById('m-pay-method').textContent = methodLabels[pay.method] || pay.method || 'Noma\'lum';
+
+  // To'lov holati — rangli
+  const statusHtml = {
+    success: '<span style="color:#16a34a;font-weight:700">✅ Tasdiqlangan</span>',
+    pending: '<span style="color:#ea580c;font-weight:700">⏳ Kutilmoqda</span>',
+    failed:  '<span style="color:#dc2626;font-weight:700">❌ Muvaffaqiyatsiz</span>',
+  };
+  document.getElementById('m-pay-status-text').innerHTML = statusHtml[pay.status] || pay.status || '—';
+
+  // Quti rangini to'lov holatiga qarab o'zgartiramiz
+  const box = document.getElementById('m-payment-box');
+  box.className = 'payment-box';
+  if (pay.status === 'pending') box.classList.add('pending');
+  else if (pay.status === 'failed') box.classList.add('failed');
+
+  // Tranzaksiya ID
+  const txnRow = document.getElementById('m-txn-row');
+  if (pay.transaction_id) {
+    document.getElementById('m-pay-txn').textContent = pay.transaction_id;
+    txnRow.style.display = '';
+  } else {
+    txnRow.style.display = 'none';
+  }
+
+  // Karta
+  const cardRow = document.getElementById('m-card-row');
+  if (pay.card_mask) {
+    document.getElementById('m-pay-card').textContent = pay.card_mask;
+    cardRow.style.display = '';
+  } else {
+    cardRow.style.display = 'none';
+  }
+
+  document.getElementById('m-pay-date').textContent   = pay.created_at || '—';
+  document.getElementById('m-pay-amount').textContent = pay.amount
+    ? Number(pay.amount).toLocaleString() + " so'm" : '—';
+
+  // ── SCREENSHOT ─────────────────────────────────────────────────────────────
+  const screenshotUrl = pay.screenshot || order.screenshot_url || '';
+  const screenshotSection = document.getElementById('m-screenshot-section');
+  const screenshotContainer = document.getElementById('screenshot-container');
+  const screenshotImg = document.getElementById('m-screenshot-img');
+  const toggleBtn = document.getElementById('btn-toggle-screenshot');
+
+  if (screenshotUrl) {
+    screenshotSection.style.display = 'block';
+    screenshotImg.src = screenshotUrl;
+    screenshotContainer.style.display = 'none';
+    toggleBtn.innerHTML = '🖼️ To\'lov chekini ko\'rish';
+  } else if (pay.method === 'admin') {
+    // Admin usulida screenshot bo'lmasligi mumkin — baribir bo'limni ko'rsatamiz
+    screenshotSection.style.display = 'block';
+    screenshotImg.src = 'https://placehold.co/600x200/f1f5f9/94a3b8?text=Chek+Yuborilmagan';
+    screenshotContainer.style.display = 'none';
+    toggleBtn.innerHTML = '🖼️ Chek rasmi (yuklanmagan)';
+  } else {
+    // Onlayn to'lovda screenshot yo'q — bo'limni yashiramiz
+    screenshotSection.style.display = pay.method === 'tpay' ? 'none' : 'block';
+  }
+
+  // ── ADMIN TASDIQLASH TUGMASI ────────────────────────────────────────────────
+  // Faqat: status=pending VA (to'lov usuli admin YOKI hali payment yo'q)
+  const confirmSection = document.getElementById('m-confirm-section');
+  const showConfirm =
+    order.status === 'pending' &&
+    pay.status !== 'success' &&
+    (!pay.method || pay.method === 'admin');
+  confirmSection.style.display = showConfirm ? 'block' : 'none';
+}
+
 function toggleScreenshotImg() {
   const c = document.getElementById('screenshot-container');
   const b = document.getElementById('btn-toggle-screenshot');
-  if (c.style.display === 'none') { c.style.display = 'block'; b.textContent = "👁️ Yashirish"; } 
-  else { c.style.display = 'none'; b.textContent = "🖼️ Skrinshotni ko'rish"; }
+  if (c.style.display === 'none') {
+    c.style.display = 'block';
+    b.innerHTML = '👁️ Chekni yashirish';
+  } else {
+    c.style.display = 'none';
+    b.innerHTML = '🖼️ To\'lov chekini ko\'rish';
+  }
 }
 
-async function approveAdminPayment(orderId) {
-  // ── 1. orderId tekshiruvi ──────────────────────────────────────────────────
-  const id = orderId ?? currentActiveOrder?.id;
-  if (!id || String(id) === 'undefined' || String(id) === 'null') {
-    alert("❌ Buyurtma ID si aniqlanmadi. Modalni yopib qayta oching.");
-    console.error('approveAdminPayment: orderId yo\'q', { orderId, currentActiveOrder });
-    return;
-  }
+function closeOrderModal() {
+  document.getElementById('orderModal').style.display = 'none';
+  currentActiveOrder = null;
+}
 
-  if (!confirm(`#${id} buyurtmaning to'lovini tasdiqlaysizmi?\nTasdiqlangach tizim kuryerni avtomatik biriktiradi.`)) return;
+// ── TO'LOV TASDIQLASH ─────────────────────────────────────────────────────────
+async function approveAdminPayment() {
+  const id = currentActiveOrder?.id;
+  if (!id) { alert("❌ Buyurtma ID topilmadi."); return; }
+  if (!confirm(`#${id} buyurtmaning to'lovini tasdiqlaysizmi?\nTasdiqlangach kuryer avtomatik biriktiriladi.`)) return;
 
-  // ── 2. Tugmani bloklash ────────────────────────────────────────────────────
   const btn = document.getElementById('m-btn-confirm-payment');
-  const origText = btn.textContent;
   btn.disabled = true;
-  btn.textContent = "⏳ Tasdiqlanmoqda...";
+  btn.textContent = '⏳ Tasdiqlanmoqda...';
 
   try {
     const res = await fetch(`/api/orders/${id}/confirm_payment/?tg_id=${TG_ID}`, {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ is_admin: true })
+      body: JSON.stringify({ is_admin: true }),
     });
-
     const data = await res.json();
 
     if (res.ok && data.success) {
-      // ── 3. Muvaffaqiyat ─────────────────────────────────────────────────────
       closeOrderModal();
-      showToast("✅ To'lov tasdiqlandi va kuryerga yo'naltirildi!");
+      showToast('✅ To\'lov tasdiqlandi va kuryerga yo\'naltirildi!');
       loadStats();
       loadOrders();
     } else {
-      // ── 4. Server xatosi ────────────────────────────────────────────────────
-      const errMsg = data.detail || data.error || `Server xatosi: ${res.status}`;
-      alert("❌ " + errMsg);
-      console.error('confirm_payment xatosi:', data);
+      alert('❌ ' + (data.detail || data.error || `Server xatosi: ${res.status}`));
     }
-  } catch (err) {
-    alert("❌ Tarmoq xatosi. Internet aloqasini tekshiring.");
-    console.error('confirm_payment fetch xatosi:', err);
+  } catch(e) {
+    alert('❌ Tarmoq xatosi.');
   } finally {
     btn.disabled = false;
-    btn.textContent = origText;
+    btn.textContent = '✅ To\'lovni Tasdiqlash va Kuryerga Yuborish';
   }
 }
 
+// ── SAQLASH ───────────────────────────────────────────────────────────────────
 async function saveModalOrder() {
   if (!currentActiveOrder) return;
   const fd = new FormData();
-  fd.append('order_id', currentActiveOrder.id);
-  fd.append('status', document.getElementById('m-status-select').value);
+  fd.append('order_id',   currentActiveOrder.id);
+  fd.append('status',     document.getElementById('m-status-select').value);
   fd.append('conclusion', document.getElementById('m-conclusion').value.trim());
   const fileInput = document.getElementById('m-file');
   if (fileInput.files.length > 0) fd.append('result_file', fileInput.files[0]);
 
   const r = await fetch(`/api/admin/orders/?tg_id=${TG_ID}`, { method: 'POST', body: fd });
   const res = await r.json();
-  if (res.success) { alert("✅ Saqlandi!"); closeOrderModal(); loadStats(); loadOrders(); }
+  if (res?.success) {
+    showToast('✅ Saqlandi!');
+    closeOrderModal();
+    loadStats();
+    loadOrders();
+  } else {
+    alert('❌ ' + (res?.error || 'Xatolik'));
+  }
 }
 
+// ── XIZMATLAR ─────────────────────────────────────────────────────────────────
 async function loadServices() {
   const el = document.getElementById('services-list-container');
   servicesData = await api(`/api/admin/services/?tg_id=${TG_ID}`) || [];
-  if (servicesData.length === 0) { el.innerHTML = '<div class="p-4 text-muted text-center">Xizmatlar topilmadi.</div>'; return; }
-
-  let html = `<table class="table"><thead><tr><th>Xizmat Nomi</th><th>Narxi (UZS)</th><th>Holat</th><th>Saqlash</th></tr></thead><tbody>`;
+  if (!servicesData.length) { el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">Xizmatlar topilmadi.</div>'; return; }
+  let html = `<table class="table"><thead><tr><th>Xizmat Nomi</th><th>Narxi</th><th>Holat</th><th></th></tr></thead><tbody>`;
   servicesData.forEach(s => {
     html += `<tr>
-        <td><b>${s.name_uz}</b></td>
-        <td><input type="number" class="input" id="price-${s.id}" value="${s.price}" style="width:100px; padding:6px;" /></td>
-        <td>
-          <select class="select" id="active-${s.id}" style="width:85px; padding:6px; font-size:12px;">
-            <option value="true" ${s.is_active?'selected':''}>Faol</option>
-            <option value="false" ${!s.is_active?'selected':''}>O'chgan</option>
-          </select>
-        </td>
-        <td><button class="btn btn-primary btn-sm" onclick="saveService(${s.id})">💾</button></td>
-      </tr>`;
+      <td><b>${esc(s.name_uz)}</b></td>
+      <td><input type="number" class="input" id="price-${s.id}" value="${s.price}" style="width:110px;padding:6px"/></td>
+      <td><select class="select" id="active-${s.id}" style="width:90px;padding:6px;font-size:12px">
+        <option value="true" ${s.is_active?'selected':''}>Faol</option>
+        <option value="false" ${!s.is_active?'selected':''}>O'chgan</option>
+      </select></td>
+      <td><button class="btn btn-primary btn-sm" onclick="saveService(${s.id})">💾</button></td>
+    </tr>`;
   });
-  el.innerHTML = html + `</tbody></table>`;
+  el.innerHTML = html + '</tbody></table>';
 }
 
 async function createNewService() {
   const nameUz = document.getElementById('new-service-name').value.trim();
   const price = parseFloat(document.getElementById('new-service-price').value);
   if (!nameUz || !price) { alert("Xizmat nomi va narxini kiriting!"); return; }
-
   const res = await api(`/api/services/?tg_id=${TG_ID}`, {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ name_uz: nameUz, price: price, is_active: true })
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name_uz: nameUz, price, is_active: true })
   });
-  if (res) { alert("🚀 Xizmat qo'shildi!"); document.getElementById('new-service-name').value = ''; document.getElementById('new-service-price').value = ''; loadServices(); }
+  if (res) { showToast('🚀 Xizmat qo\'shildi!'); document.getElementById('new-service-name').value=''; document.getElementById('new-service-price').value=''; loadServices(); }
 }
 
 async function saveService(id) {
   const price = parseFloat(document.getElementById(`price-${id}`).value) || 0;
   const is_active = document.getElementById(`active-${id}`).value === 'true';
   const res = await api(`/api/admin/services/?tg_id=${TG_ID}`, {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id, price, is_active })
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, price, is_active})
   });
-  if (res && res.success) { alert("🩺 Narx yangilandi!"); loadServices(); }
+  if (res?.success) { showToast('🩺 Narx yangilandi!'); loadServices(); }
 }
 
+// ── TUMANLAR ──────────────────────────────────────────────────────────────────
 async function loadRegions() {
   regionsData = await api(`/api/regions/?tg_id=${TG_ID}`) || [];
   const select = document.getElementById('new-district-region');
@@ -635,100 +769,87 @@ async function loadRegions() {
 
 async function createNewRegion() {
   const rName = document.getElementById('new-region-name').value.trim();
-  if(!rName) { alert("Viloyat nomini yozing!"); return; }
-  const res = await api(`/api/regions/?tg_id=${TG_ID}`, {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name_uz: rName })
-  });
-  if(res) { alert("✅ Viloyat qo'shildi!"); document.getElementById('new-region-name').value = ''; loadRegions(); }
+  if (!rName) { alert("Viloyat nomini yozing!"); return; }
+  const res = await api(`/api/regions/?tg_id=${TG_ID}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name_uz: rName}) });
+  if (res) { showToast('✅ Viloyat qo\'shildi!'); document.getElementById('new-region-name').value=''; loadRegions(); }
 }
 
 async function loadDistricts() {
   const el = document.getElementById('districts-list-container');
   districtsData = await api(`/api/districts/?tg_id=${TG_ID}`) || [];
-  if (districtsData.length === 0) { el.innerHTML = '<div class="p-4 text-muted text-center">Tumanlar mavjud emas.</div>'; return; }
-
-  let html = `<table class="table"><thead><tr><th>ID</th><th>Tuman Nomi</th><th>Tegishli Viloyat</th></tr></thead><tbody>`;
+  if (!districtsData.length) { el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">Tumanlar mavjud emas.</div>'; return; }
+  let html = `<table class="table"><thead><tr><th>ID</th><th>Tuman Nomi</th><th>Viloyat</th></tr></thead><tbody>`;
   districtsData.forEach(d => {
-    const regObj = regionsData.find(x => x.id === d.region);
-    const regName = regObj ? (regObj.name_uz || regObj.name) : `ID: ${d.region}`;
-    html += `<tr><td><b>#${d.id}</b></td><td><span class="badge badge-orange">📍 ${d.name_uz || d.name}</span></td><td><b>${regName}</b></td></tr>`;
+    const reg = regionsData.find(x => x.id === d.region);
+    html += `<tr><td><b>#${d.id}</b></td><td><span class="badge badge-orange">📍 ${d.name_uz || d.name}</span></td><td>${reg ? (reg.name_uz || reg.name) : `ID: ${d.region}`}</td></tr>`;
   });
-  el.innerHTML = html + `</tbody></table>`;
+  el.innerHTML = html + '</tbody></table>';
 }
 
 async function createNewDistrict() {
   const dName = document.getElementById('new-district-name').value.trim();
   const regId = document.getElementById('new-district-region').value;
   if (!dName || !regId) { alert("Tuman nomi va viloyatni tanlang!"); return; }
+  const res = await api(`/api/districts/?tg_id=${TG_ID}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name_uz: dName, region: parseInt(regId)}) });
+  if (res) { showToast('📍 Tuman qo\'shildi!'); document.getElementById('new-district-name').value=''; loadDistricts(); }
+}
 
-  const res = await api(`/api/districts/?tg_id=${TG_ID}`, {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name_uz: dName, region: parseInt(regId) })
-  });
-  if (res) { alert("📍 Tuman qo'shildi!"); document.getElementById('new-district-name').value = ''; loadDistricts(); }
+// ── XODIMLAR ──────────────────────────────────────────────────────────────────
+function toggleStaffDistrictSelect() {
+  const role = document.getElementById('staff-role').value;
+  document.getElementById('staff-district-block').style.display = role === 'courier' ? 'block' : 'none';
 }
 
 async function loadStaff() {
   const el = document.getElementById('staff-list-container');
-  
-  if(districtsData.length === 0) { districtsData = await api(`/api/districts/?tg_id=${TG_ID}`) || []; }
+  if (!districtsData.length) districtsData = await api(`/api/districts/?tg_id=${TG_ID}`) || [];
+
   const dSelect = document.getElementById('staff-district');
-  dSelect.innerHTML = '<option value="">-- Tumanni tanlang (Majburiy emas) --</option>';
+  dSelect.innerHTML = '<option value="">-- Tumanni tanlang --</option>';
   districtsData.forEach(d => { dSelect.innerHTML += `<option value="${d.id}">${d.name_uz || d.name}</option>`; });
 
   staffData = await api(`/api/users/?role=staff&tg_id=${TG_ID}`) || [];
-  if(staffData.length === 0) { el.innerHTML = '<div class="p-4 text-muted text-center">Xodimlar topilmadi.</div>'; return; }
+  if (!staffData.length) { el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">Xodimlar topilmadi.</div>'; return; }
 
-  let html = `<table class="table"><thead><tr><th>User ID</th><th>FIO</th><th>Roli</th><th>Biriktirilgan tuman</th><th>Telefon</th></tr></thead><tbody>`;
+  let html = `<table class="table"><thead><tr><th>User ID</th><th>FIO</th><th>Roli</th><th>Tuman</th><th>Telefon</th></tr></thead><tbody>`;
   staffData.forEach(s => {
-    let roleBadge = s.role === 'admin' ? '<span class="badge badge-blue">💻 Admin</span>' : s.role === 'doctor' ? '<span class="badge badge-orange">🩺 Doctor</span>' : '<span class="badge badge-green">🚚 Kuryer</span>';
-    let dName = "-";
-    if (s.role === 'courier' && s.district) {
-       const distObj = districtsData.find(x => x.id === s.district);
-       dName = distObj ? `<span class="badge badge-orange">📍 ${distObj.name_uz || distObj.name}</span>` : `ID: ${s.district}`;
+    const roleBadge = s.role==='admin' ? '<span class="badge badge-blue">💻 Admin</span>' : s.role==='doctor' ? '<span class="badge badge-orange">🩺 Doctor</span>' : '<span class="badge badge-green">🚚 Kuryer</span>';
+    let dName = "—";
+    if (s.role==='courier' && s.district) {
+      const d = districtsData.find(x => x.id === s.district);
+      dName = d ? `<span class="badge badge-orange">📍 ${d.name_uz||d.name}</span>` : `ID:${s.district}`;
     }
-
-    html += `<tr>
-      <td><code>${s.user_id || s.id}</code></td>
-      <td><b>${s.first_name || s.name || 'Xodim'}</b></td>
-      <td>${roleBadge}</td>
-      <td>${dName}</td>
-      <td>${s.phone_number || '-'}</td>
-    </tr>`;
+    html += `<tr><td><code>${s.user_id||s.id}</code></td><td><b>${esc(s.first_name||s.name||'Xodim')}</b></td><td>${roleBadge}</td><td>${dName}</td><td>${s.phone_number||'—'}</td></tr>`;
   });
-  el.innerHTML = html + `</tbody></table>`;
+  el.innerHTML = html + '</tbody></table>';
 }
 
 async function createNewStaff() {
-  const tgId = document.getElementById('staff-tg-id').value;
-  const name = document.getElementById('staff-name').value.trim();
-  const role = document.getElementById('staff-role').value;
-  const phone = document.getElementById('staff-phone').value.trim();
-  const districtId = document.getElementById('staff-district').value;
+  const tgId2   = document.getElementById('staff-tg-id').value;
+  const name    = document.getElementById('staff-name').value.trim();
+  const role    = document.getElementById('staff-role').value;
+  const phone   = document.getElementById('staff-phone').value.trim();
+  const distId  = document.getElementById('staff-district').value;
+  if (!tgId2 || !name) { alert("Telegram ID va Ismni kiritish majburiy!"); return; }
 
-  if(!tgId || !name) { alert("Telegram ID va Ismni kiritish majburiy!"); return; }
+  const payload = { user_id: tgId2, first_name: name, role, phone_number: phone, is_staff: true };
+  if (role==='courier' && distId) payload.district = parseInt(distId);
 
-  const payload = { user_id: tgId, first_name: name, role: role, phone_number: phone, is_staff: true };
-  if (role === 'courier' && districtId) { payload.district = parseInt(districtId); }
-
-  const res = await api(`/api/users/?tg_id=${TG_ID}`, {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
-  });
-
-  if(res) {
-    alert("👥 Xodim qo'shildi!");
-    document.getElementById('staff-tg-id').value = '';
-    document.getElementById('staff-name').value = '';
-    document.getElementById('staff-phone').value = '';
-    document.getElementById('staff-district').value = '';
+  const res = await api(`/api/users/?tg_id=${TG_ID}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  if (res) {
+    showToast('👥 Xodim qo\'shildi!');
+    ['staff-tg-id','staff-name','staff-phone'].forEach(id => document.getElementById(id).value='');
+    document.getElementById('staff-district').value='';
     loadStaff();
   }
 }
 
+// ── BROADCAST ─────────────────────────────────────────────────────────────────
 function renderBroadcast() {
   const el = document.getElementById('tab-broadcast');
   el.innerHTML = `
     <div class="card">
-      <div class="font-semibold" style="font-size:14px;">📣 Smart Reklama Muharriri</div>
+      <div class="font-semibold" style="font-size:14px">📣 Smart Reklama Muharriri</div>
       <div class="editor-toolbar">
         <button class="editor-btn" onclick="wrapText('b')"><b>B</b></button>
         <button class="editor-btn" onclick="wrapText('i')"><i>I</i></button>
@@ -736,94 +857,85 @@ function renderBroadcast() {
         <button class="editor-btn" onclick="wrapText('spoiler')">🔒 Spoiler</button>
         <button class="editor-btn" onclick="insertLink()">🔗 Havola</button>
       </div>
-      <textarea class="textarea editor-textarea" id="bText" rows="6" placeholder="Xabarni yozing..." style="width:100%; padding:10px; border:1px solid var(--border)"></textarea>
-      <div class="mt-3"><input type="file" id="bMedia" accept="image/*,video/*" class="input" /></div>
+      <textarea class="textarea editor-textarea" id="bText" rows="6" placeholder="Xabarni yozing..." style="width:100%;padding:10px;border:1px solid var(--border)"></textarea>
+      <div class="mt-3"><input type="file" id="bMedia" accept="image/*,video/*" class="input"/></div>
       <button class="btn btn-primary btn-block mt-4" id="bSend">🚀 Reklamani Yuborish</button>
     </div><div id="bResult"></div>`;
 
   document.getElementById('bSend').addEventListener('click', async () => {
     const txt = document.getElementById('bText').value.trim();
-    const mediaInput = document.getElementById('bMedia');
-    if (!txt && mediaInput.files.length === 0) return;
-
-    const btn = document.getElementById('bSend'); btn.disabled = true; btn.textContent = "Yuborilmoqda...";
+    const mi  = document.getElementById('bMedia');
+    if (!txt && mi.files.length === 0) return;
+    const btn = document.getElementById('bSend');
+    btn.disabled=true; btn.textContent='Yuborilmoqda...';
     const fd = new FormData(); fd.append('text', txt);
-    if (mediaInput.files.length > 0) fd.append('media', mediaInput.files[0]);
-
-    const r = await fetch(`/api/admin/broadcast/?tg_id=${TG_ID}`, { method: 'POST', body: fd });
-    const rData = await r.json();
-    if (rData && rData.success) {
-      document.getElementById('bResult').innerHTML = `<div class="card" style="background:#f0fdf4; text-align:center; padding:12px; color:#166534"><b>✅ Jami ${rData.sent} ta foydalanuvchiga yuborildi.</b></div>`;
-      document.getElementById('bText').value = ''; mediaInput.value = '';
+    if (mi.files.length > 0) fd.append('media', mi.files[0]);
+    const r = await fetch(`/api/admin/broadcast/?tg_id=${TG_ID}`, { method:'POST', body:fd });
+    const d = await r.json();
+    if (d?.success) {
+      document.getElementById('bResult').innerHTML = `<div class="card" style="background:#f0fdf4;text-align:center;padding:12px;color:#166534"><b>✅ Jami ${d.sent} ta foydalanuvchiga yuborildi.</b></div>`;
+      document.getElementById('bText').value=''; mi.value='';
     }
-    btn.disabled = false; btn.textContent = "🚀 Reklamani Yuborish";
+    btn.disabled=false; btn.textContent='🚀 Reklamani Yuborish';
   });
 }
 
 function wrapText(tag) {
-  const t = document.getElementById('bText');
-  const s = t.selectionStart; const e = t.selectionEnd; const txt = t.value;
-  let o = `<${tag}>`, c = `</${tag}>`; if(tag === 'spoiler') { o = '<tg-spoiler>'; c = '</tg-spoiler>'; }
-  t.value = txt.substring(0, s) + o + txt.substring(s, e) + c + txt.substring(e); t.focus();
+  const t=document.getElementById('bText'); const s=t.selectionStart; const e=t.selectionEnd;
+  let o=`<${tag}>`,c=`</${tag}>`;
+  if(tag==='spoiler'){o='<tg-spoiler>';c='</tg-spoiler>';}
+  t.value=t.value.substring(0,s)+o+t.value.substring(s,e)+c+t.value.substring(e); t.focus();
 }
-
 function insertLink() {
-  const url = prompt("URL kiriting:", "https://"); if (!url) return;
-  const t = document.getElementById('bText'); const s = t.selectionStart; const e = t.selectionEnd;
-  t.value = t.value.substring(0, s) + `<a href="${url}">${t.value.substring(s, e) || 'Havola'}</a>` + t.value.substring(e); t.focus();
+  const url=prompt("URL kiriting:","https://"); if(!url)return;
+  const t=document.getElementById('bText'); const s=t.selectionStart; const e=t.selectionEnd;
+  t.value=t.value.substring(0,s)+`<a href="${url}">${t.value.substring(s,e)||'Havola'}</a>`+t.value.substring(e); t.focus();
 }
 
+// ── SETTINGS ─────────────────────────────────────────────────────────────────
 async function loadSettings() {
   const data = await api(`/api/admin/settings/?tg_id=${TG_ID}`);
   if (data) {
-    document.getElementById('set-delivery-fee').value = data.delivery_fee || 0;
-    document.getElementById('set-support').value = data.support_contact || '';
+    document.getElementById('set-delivery-fee').value = data.delivery_fee||0;
+    document.getElementById('set-support').value = data.support_contact||'';
   }
 }
 async function saveSettings() {
-  const data = { delivery_fee: parseFloat(document.getElementById('set-delivery-fee').value) || 0, support_contact: document.getElementById('set-support').value.trim() };
-  const res = await api(`/api/admin/settings/?tg_id=${TG_ID}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-  if (res && res.success) { alert("⚙️ Sozlamalar saqlandi!"); loadSettings(); }
+  const data = { delivery_fee: parseFloat(document.getElementById('set-delivery-fee').value)||0, support_contact: document.getElementById('set-support').value.trim() };
+  const res = await api(`/api/admin/settings/?tg_id=${TG_ID}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+  if (res?.success) { showToast('⚙️ Sozlamalar saqlandi!'); }
 }
 
-let leafMap = null; let leafMarker = null;
+// ── XARITA ────────────────────────────────────────────────────────────────────
+let leafMap=null; let leafMarker=null;
 function toggleMapInModal() {
-  const mapCont = document.getElementById('map-container');
-  if (mapCont.style.display === 'block') { mapCont.style.display = 'none'; } 
-  else {
-    mapCont.style.display = 'block';
-    setTimeout(() => {
-      const lat = currentActiveOrder.latitude; const lng = currentActiveOrder.longitude;
-      if (!leafMap) {
-        leafMap = L.map('map').setView([lat, lng], 14); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(leafMap);
-        leafMarker = L.marker([lat, lng]).addTo(leafMap);
-      } else { leafMap.setView([lat, lng], 14); leafMarker.setLatLng([lat, lng]); leafMap.invalidateSize(); }
-    }, 180);
-  }
+  const mc = document.getElementById('map-container');
+  if (mc.style.display==='block') { mc.style.display='none'; return; }
+  mc.style.display='block';
+  setTimeout(() => {
+    const lat=currentActiveOrder.latitude; const lng=currentActiveOrder.longitude;
+    if (!leafMap) {
+      leafMap=L.map('map').setView([lat,lng],14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(leafMap);
+      leafMarker=L.marker([lat,lng]).addTo(leafMap);
+    } else { leafMap.setView([lat,lng],14); leafMarker.setLatLng([lat,lng]); leafMap.invalidateSize(); }
+  }, 180);
 }
-function closeMap() { document.getElementById('map-container').style.display = 'none'; }
+function closeMap() { document.getElementById('map-container').style.display='none'; }
 
-// ── Toast xabar ──────────────────────────────────────────────────────────────
-function showToast(msg, isError = false) {
-  let toast = document.getElementById('admin-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'admin-toast';
-    toast.style.cssText = `
-      position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
-      padding:12px 20px; border-radius:12px; font-weight:600; font-size:13px;
-      color:#fff; z-index:9999; box-shadow:0 4px 16px rgba(0,0,0,0.18);
-      transition:opacity 0.3s; max-width:90vw; text-align:center;
-    `;
-    document.body.appendChild(toast);
-  }
-  toast.style.background = isError ? '#dc2626' : '#16a34a';
-  toast.textContent = msg;
-  toast.style.opacity = '1';
-  clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, isError=false) {
+  const t = document.getElementById('admin-toast');
+  t.textContent = msg;
+  t.style.background = isError ? '#dc2626' : '#16a34a';
+  t.style.display = 'block';
+  t.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.opacity='0'; setTimeout(()=>{t.style.display='none';}, 300); }, 3000);
 }
 
+// ── INIT ──────────────────────────────────────────────────────────────────────
 loadStats();
 loadOrders();
 </script>

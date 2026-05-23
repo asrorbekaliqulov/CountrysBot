@@ -849,62 +849,147 @@ def admin_stats_api(request):
 # ── 2. BUYURTMALAR API (Tuman nomi va xarita linki bilan) ──────────────────
 @csrf_exempt
 def admin_orders_api(request):
+    """
+    GET  /api/admin/orders/?tg_id=...  — Buyurtmalar ro'yxati (to'lov + screenshot bilan)
+    POST /api/admin/orders/?tg_id=...  — Status va natija yangilash
+    """
+    tg_id = request.GET.get('tg_id')
+    if not tg_id or not TelegramUser.objects.filter(user_id=tg_id).exists():
+        return JsonResponse({'error': 'Ruxsat berilmagan'}, status=403)
+ 
+    # ── GET ────────────────────────────────────────────────────────────────────
     if request.method == 'GET':
-        orders = Order.objects.select_related('user', 'service', 'district').order_by('-created_at')[:50]
+        orders = (
+            Order.objects
+            .select_related('user', 'service', 'district', 'payment')
+            .prefetch_related('test_result')
+            .order_by('-created_at')[:50]
+        )
+ 
         orders_list = []
         for o in orders:
-            # Tuman nomini aniqlash (modelingizga qarab name yoki name_uz)
+            # ── Tuman nomi ────────────────────────────────────────────────────
             d_name = "—"
             if o.district:
-                d_name = getattr(o.district, 'name_uz', None) or getattr(o.district, 'name', None) or str(o.district)
-
+                d_name = (
+                    getattr(o.district, 'name_uz', None)
+                    or getattr(o.district, 'name', None)
+                    or str(o.district)
+                )
+ 
+            # ── To'lov (Payment) ma'lumotlari ─────────────────────────────────
+            payment_data = {}
+            try:
+                pay = o.payment  # OneToOne — AttributeError bo'lishi mumkin
+                screenshot_url = ''
+ 
+                # Screenshot URL ni to'g'ri olish
+                if pay.screenshot:
+                    try:
+                        # ImageField bo'lsa .url xususiyati bor
+                        screenshot_url = pay.screenshot.url
+                    except Exception:
+                        screenshot_url = str(pay.screenshot)
+ 
+                payment_data = {
+                    'method':         pay.method or '',          # 'admin' | 'tpay'
+                    'status':         pay.status or 'pending',   # 'pending' | 'success' | 'failed'
+                    'transaction_id': pay.transaction_id or '',
+                    'card_mask':      getattr(pay, 'card_mask', '') or '',
+                    'screenshot':     screenshot_url,
+                    'created_at':     pay.created_at.strftime("%Y-%m-%d %H:%M") if pay.created_at else '',
+                    'amount':         float(pay.amount) if pay.amount else 0,
+                }
+            except Exception:
+                # Payment hali yaratilmagan buyurtmalar uchun
+                payment_data = {
+                    'method': '',
+                    'status': 'pending',
+                    'transaction_id': '',
+                    'card_mask': '',
+                    'screenshot': '',
+                    'created_at': '',
+                    'amount': 0,
+                }
+ 
+            # ── Natija fayli bormi ─────────────────────────────────────────────
+            has_result = False
+            conclusion = ''
+            try:
+                tr = o.test_result
+                has_result = bool(tr.result_file)
+                conclusion = tr.doctor_conclusion or ''
+            except Exception:
+                pass
+ 
+            # ── Bemor telefoni ────────────────────────────────────────────────
+            phone = ''
+            if o.user:
+                phone = o.user.phone or o.user.phone_number or ''
+ 
             orders_list.append({
-                'id': o.id,
+                'id':           o.id,
                 'patient_name': o.patient_name or (o.user.first_name if o.user else "Noma'lum"),
-                'patient_type': o.patient_type,
+                'patient_type': o.patient_type or 'adult',
                 'service_name': o.service.name_uz if o.service else "—",
-                'total_price': float(o.total_price or 0),
-                'status': o.status,
-                'created_at': o.created_at.strftime("%Y-%m-%d %H:%M"),
-                'district_name': d_name,
-                'address_note': o.address_note or "",
-                'latitude': o.latitude,
-                'longitude': o.longitude,
-                'has_result': hasattr(o, 'test_result') and bool(o.test_result.result_file)
+                'total_price':  float(o.total_price or 0),
+                'status':       o.status,
+                'created_at':   o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else '',
+                'district_name':d_name,
+                'address_note': o.address_note or '',
+                'latitude':     o.latitude,
+                'longitude':    o.longitude,
+                'has_result':   has_result,
+                'conclusion':   conclusion,
+                'phone':        phone,
+ 
+                # ── To'lov ma'lumotlari (modal uchun asosiy) ──────────────────
+                'payment':      payment_data,
+ 
+                # ── Eski frontendlar uchun qisqa ko'rinish (backward compat) ──
+                'screenshot_url': payment_data['screenshot'],
             })
+ 
         return JsonResponse(orders_list, safe=False)
-
+ 
+    # ── POST ───────────────────────────────────────────────────────────────────
     elif request.method == 'POST':
         try:
-            if request.content_type.startswith('multipart/form-data') or request.FILES:
-                order_id = request.POST.get('order_id')
-                status = request.POST.get('status')
+            if request.content_type and request.content_type.startswith('multipart/form-data') or request.FILES:
+                order_id    = request.POST.get('order_id')
+                new_status  = request.POST.get('status')
                 result_file = request.FILES.get('result_file')
-                conclusion = request.POST.get('conclusion', '')
+                conclusion  = request.POST.get('conclusion', '')
             else:
-                data = json.loads(request.body)
-                order_id = data.get('order_id')
-                status = data.get('status')
+                data        = json.loads(request.body)
+                order_id    = data.get('order_id')
+                new_status  = data.get('status')
                 result_file = None
-                conclusion = data.get('conclusion', '')
-
+                conclusion  = data.get('conclusion', '')
+ 
             order = Order.objects.get(id=order_id)
-            if status:
-                order.status = status
+ 
+            if new_status:
+                order.status = new_status
                 order.save()
-
+ 
             if result_file or conclusion:
+                tg_user = TelegramUser.objects.filter(user_id=tg_id).first()
                 test_result, _ = TestResult.objects.get_or_create(order=order)
+                if tg_user:
+                    test_result.doctor = tg_user
                 if result_file:
                     test_result.result_file = result_file
                 if conclusion:
                     test_result.doctor_conclusion = conclusion
                 test_result.status = 'ready'
                 test_result.save()
-
+ 
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
+ 
+    return JsonResponse({'error': "Faqat GET yoki POST"}, status=405)
 
 # ── 3. SOZLAMALAR API (APPEND_SLASH muammosi to'liq yechildi) ───────────────
 @csrf_exempt
