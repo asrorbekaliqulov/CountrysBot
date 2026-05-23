@@ -1,335 +1,816 @@
 {% load i18n %}
 <!DOCTYPE html>
-<html lang="{{ request.LANGUAGE_CODE|default:'uz' }}">
+<html lang="uz">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>{% translate "Kuryer Paneli" %}</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <title>Kuryer Paneli</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        .fade-in { animation: fadeIn 0.2s ease-out forwards; }
-        .collapse-anim { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); max-height: 0; opacity: 0; overflow: hidden; }
-        .collapse-anim.expanded { max-height: 500px; opacity: 1; padding-top: 12px; padding-bottom: 12px; }
-        
-        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
-        
-        .skel { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200% 100%; animation: sk 1.4s infinite; }
-        @keyframes sk { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+        :root {
+            --c-bg: #F4F6FB;
+            --c-white: #FFFFFF;
+            --c-paid: #F59E0B;
+            --c-paid-light: #FEF3C7;
+            --c-paid-dark: #D97706;
+            --c-delivering: #3B82F6;
+            --c-delivering-light: #DBEAFE;
+            --c-delivering-dark: #2563EB;
+            --c-done: #10B981;
+            --c-done-light: #D1FAE5;
+            --c-done-dark: #059669;
+            --c-text: #1E293B;
+            --c-muted: #94A3B8;
+            --c-border: #E2E8F0;
+            --radius: 18px;
+            --radius-sm: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: var(--c-bg);
+            color: var(--c-text);
+            min-height: 100dvh;
+            overscroll-behavior: none;
+        }
+
+        /* ── LOADING ── */
+        #loadingScreen {
+            position: fixed; inset: 0; background: var(--c-white);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100; gap: 14px;
+        }
+        .loader-truck {
+            font-size: 48px;
+            animation: truck 1s ease-in-out infinite alternate;
+        }
+        @keyframes truck { from { transform: translateX(-8px); } to { transform: translateX(8px); } }
+        .loader-text { font-size: 14px; color: var(--c-muted); font-weight: 600; }
+
+        /* ── ACCESS DENIED ── */
+        #accessDeniedScreen {
+            position: fixed; inset: 0; background: var(--c-white);
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100; padding: 32px; text-align: center; gap: 12px;
+        }
+        #accessDeniedScreen h2 { font-size: 22px; font-weight: 800; }
+        #accessDeniedScreen p { font-size: 14px; color: var(--c-muted); }
+
+        /* ── LAYOUT ── */
+        #mainApp { display: none; flex-direction: column; height: 100dvh; }
+
+        /* ── HEADER ── */
+        .header {
+            background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+            color: white;
+            padding: 48px 20px 20px;
+            flex-shrink: 0;
+        }
+        .header-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+        .header-title { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
+        .header-subtitle { font-size: 12px; color: #94A3B8; margin-top: 2px; font-weight: 600; }
+        .refresh-btn {
+            width: 40px; height: 40px; background: rgba(255,255,255,0.1);
+            border: none; border-radius: 50%; cursor: pointer; color: white;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s; flex-shrink: 0;
+        }
+        .refresh-btn:active { background: rgba(255,255,255,0.2); transform: scale(0.92); }
+
+        /* Stats chips */
+        .header-stats { display: flex; gap: 8px; flex-wrap: wrap; }
+        .stat-chip {
+            display: flex; align-items: center; gap: 6px;
+            padding: 6px 12px; border-radius: 100px;
+            font-size: 12px; font-weight: 700;
+        }
+        .stat-chip.paid-chip   { background: rgba(245,158,11,0.2); color: #FCD34D; }
+        .stat-chip.deliv-chip  { background: rgba(59,130,246,0.2); color: #93C5FD; }
+        .stat-chip.done-chip   { background: rgba(16,185,129,0.2); color: #6EE7B7; }
+        .stat-chip .dot { width: 6px; height: 6px; border-radius: 50%; }
+        .paid-chip .dot   { background: #FCD34D; }
+        .deliv-chip .dot  { background: #93C5FD; }
+        .done-chip .dot   { background: #6EE7B7; }
+
+        /* ── TABS ── */
+        .tabs {
+            display: flex; gap: 4px;
+            padding: 12px 16px;
+            background: var(--c-white);
+            border-bottom: 1px solid var(--c-border);
+            flex-shrink: 0;
+            overflow-x: auto;
+        }
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab-btn {
+            display: flex; align-items: center; gap: 6px;
+            padding: 8px 14px; border-radius: 100px;
+            border: none; cursor: pointer;
+            font-family: 'Nunito', sans-serif;
+            font-size: 13px; font-weight: 700;
+            white-space: nowrap;
+            background: var(--c-bg); color: var(--c-muted);
+            transition: all 0.2s;
+        }
+        .tab-btn .badge {
+            min-width: 18px; height: 18px; padding: 0 5px;
+            border-radius: 100px; font-size: 10px; font-weight: 800;
+            display: flex; align-items: center; justify-content: center;
+            background: #E2E8F0; color: #64748B;
+        }
+        .tab-btn.active-paid   { background: var(--c-paid-light);       color: var(--c-paid-dark); }
+        .tab-btn.active-paid .badge   { background: var(--c-paid);     color: white; }
+        .tab-btn.active-deliv  { background: var(--c-delivering-light); color: var(--c-delivering-dark); }
+        .tab-btn.active-deliv .badge  { background: var(--c-delivering); color: white; }
+        .tab-btn.active-done   { background: var(--c-done-light);        color: var(--c-done-dark); }
+        .tab-btn.active-done .badge   { background: var(--c-done);      color: white; }
+
+        /* ── ORDERS SCROLL ── */
+        #ordersContainer {
+            flex: 1; overflow-y: auto; padding: 16px;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        #ordersContainer::-webkit-scrollbar { display: none; }
+
+        /* ── ORDER CARD ── */
+        .order-card {
+            background: var(--c-white);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            animation: slideUp 0.25s ease-out forwards;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .card-accent { height: 4px; }
+        .status-paid       .card-accent { background: linear-gradient(90deg, var(--c-paid), #FB923C); }
+        .status-delivering .card-accent { background: linear-gradient(90deg, var(--c-delivering), #6366F1); }
+        .status-done       .card-accent { background: linear-gradient(90deg, var(--c-done), #06B6D4); }
+
+        .card-header { padding: 14px 16px 12px; cursor: pointer; }
+        .card-header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .order-id { font-size: 11px; font-weight: 800; color: var(--c-muted); letter-spacing: 0.5px; text-transform: uppercase; }
+
+        .status-badge {
+            display: flex; align-items: center; gap: 4px;
+            padding: 3px 10px; border-radius: 100px;
+            font-size: 11px; font-weight: 800;
+        }
+        .badge-paid       { background: var(--c-paid-light);       color: var(--c-paid-dark); }
+        .badge-delivering { background: var(--c-delivering-light); color: var(--c-delivering-dark); }
+        .badge-done       { background: var(--c-done-light);        color: var(--c-done-dark); }
+
+        .patient-name { font-size: 17px; font-weight: 800; line-height: 1.2; }
+        .patient-meta { font-size: 12px; color: var(--c-muted); font-weight: 600; margin-top: 2px; }
+
+        .card-location {
+            display: flex; align-items: center; gap: 6px;
+            margin-top: 10px; padding: 8px 12px;
+            background: var(--c-bg); border-radius: var(--radius-sm);
+        }
+        .location-icon { font-size: 14px; flex-shrink: 0; }
+        .location-text { font-size: 13px; font-weight: 700; color: var(--c-text); }
+        .chevron { margin-left: auto; font-size: 12px; color: var(--c-muted); transition: transform 0.25s; }
+        .chevron.open { transform: rotate(180deg); }
+
+        /* Details expand */
+        .card-details {
+            max-height: 0; overflow: hidden;
+            transition: max-height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.25s;
+            opacity: 0;
+        }
+        .card-details.open { max-height: 600px; opacity: 1; }
+        .details-inner { padding: 0 16px 4px; border-top: 1px solid var(--c-border); }
+
+        /* Detail row */
+        .detail-row { padding: 10px 0; border-bottom: 1px solid var(--c-border); }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-label { font-size: 10px; font-weight: 800; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 3px; }
+        .detail-value { font-size: 13px; font-weight: 700; color: var(--c-text); }
+
+        /* Phone link */
+        .phone-link {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px; margin: 10px 0;
+            background: #F0FDF4; border: 1.5px solid #BBF7D0;
+            border-radius: var(--radius-sm); text-decoration: none;
+            transition: all 0.15s;
+        }
+        .phone-link:active { transform: scale(0.98); }
+        .phone-icon {
+            width: 34px; height: 34px; border-radius: 50%;
+            background: var(--c-done); color: white;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; flex-shrink: 0;
+        }
+        .phone-label { font-size: 10px; font-weight: 800; color: var(--c-done-dark); text-transform: uppercase; letter-spacing: 0.5px; }
+        .phone-number { font-size: 15px; font-weight: 800; color: #065F46; }
+
+        /* Map buttons */
+        .map-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .map-btn {
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+            padding: 9px 0; border-radius: var(--radius-sm); border: none;
+            font-family: 'Nunito', sans-serif; font-size: 12px; font-weight: 800;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .map-btn:active { transform: scale(0.96); }
+        .map-google { background: #DBEAFE; color: #1D4ED8; }
+        .map-yandex { background: #FEF3C7; color: #92400E; }
+
+        /* ── ACTION BUTTONS ── */
+        .card-actions { padding: 12px 16px 16px; display: flex; gap: 8px; }
+
+        .action-btn {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+            height: 46px; border-radius: var(--radius-sm); border: none;
+            font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 800;
+            cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden;
+        }
+        .action-btn:active { transform: scale(0.97); }
+        .action-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        .btn-start    { background: var(--c-delivering); color: white; }
+        .btn-start:hover { background: var(--c-delivering-dark); }
+
+        .btn-done     { background: var(--c-done); color: white; }
+        .btn-done:hover { background: var(--c-done-dark); }
+
+        .btn-info {
+            flex: 0 0 46px; background: var(--c-bg); color: var(--c-muted);
+            border: 1.5px solid var(--c-border);
+        }
+
+        /* Done card style */
+        .done-card { opacity: 0.7; }
+        .done-card .card-header { cursor: pointer; }
+
+        /* ── EMPTY STATE ── */
+        .empty-state {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 60px 20px; gap: 12px; text-align: center;
+        }
+        .empty-icon { font-size: 56px; }
+        .empty-title { font-size: 17px; font-weight: 800; color: var(--c-text); }
+        .empty-sub { font-size: 13px; color: var(--c-muted); font-weight: 600; }
+
+        /* ── SKELETON ── */
+        .skel {
+            background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
+            background-size: 200% 100%;
+            animation: skel 1.4s infinite; border-radius: 8px;
+        }
+        @keyframes skel { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* ── TOAST ── */
+        .toast {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            background: #1E293B; color: white;
+            padding: 12px 24px; border-radius: 100px;
+            font-size: 14px; font-weight: 700;
+            z-index: 999; white-space: nowrap;
+            animation: toastIn 0.25s ease-out;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        }
+        @keyframes toastIn { from { opacity:0; bottom:8px; } to { opacity:1; bottom:24px; } }
+
+        /* ── MODAL ── */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            z-index: 200; display: none; align-items: flex-end;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-sheet {
+            background: var(--c-white); border-radius: 24px 24px 0 0;
+            padding: 0 0 32px; width: 100%; max-height: 90dvh; overflow-y: auto;
+            animation: sheetUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-handle { width: 40px; height: 4px; background: #E2E8F0; border-radius: 2px; margin: 12px auto 20px; }
+        .modal-title { font-size: 18px; font-weight: 900; padding: 0 20px 16px; border-bottom: 1px solid var(--c-border); }
+        .modal-body { padding: 16px 20px; }
+        .modal-row { padding: 10px 0; border-bottom: 1px solid var(--c-border); }
+        .modal-row:last-child { border-bottom: none; }
+        .modal-label { font-size: 11px; font-weight: 800; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+        .modal-value { font-size: 15px; font-weight: 700; }
+        .modal-close-btn {
+            margin: 4px 20px 0; width: calc(100% - 40px);
+            height: 48px; background: var(--c-bg); border: none;
+            border-radius: var(--radius-sm); font-family: 'Nunito', sans-serif;
+            font-size: 15px; font-weight: 800; color: var(--c-muted); cursor: pointer;
+        }
+
+        /* Spinning icon */
+        .spin { animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .section-title {
+            font-size: 11px; font-weight: 800; color: var(--c-muted);
+            text-transform: uppercase; letter-spacing: 0.8px;
+            padding: 4px 4px 8px;
+        }
     </style>
 </head>
-<body class="bg-slate-50 font-sans antialiased text-slate-900 select-none">
+<body>
 
-    <div id="loadingScreen" class="fixed inset-0 bg-white flex items-center justify-center z-50">
-        <div class="text-center space-y-3">
-            <svg class="animate-spin h-8 w-8 text-amber-500 mx-auto" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p class="text-slate-500 text-sm">{% translate "Yuklanmoqda..." %}</p>
+<!-- Loading -->
+<div id="loadingScreen">
+    <div class="loader-truck">🚚</div>
+    <p class="loader-text">Yuklanmoqda...</p>
+</div>
+
+<!-- Access Denied -->
+<div id="accessDeniedScreen">
+    <div style="font-size:56px">🚫</div>
+    <h2>Ruxsat yo'q</h2>
+    <p>Ushbu panel faqat kuryerlar uchun. Agar siz kuryersiz, admindan murojaat qiling.</p>
+</div>
+
+<!-- Main App -->
+<div id="mainApp" style="display:none; flex-direction:column; height:100dvh;">
+
+    <!-- Header -->
+    <div class="header">
+        <div class="header-top">
+            <div>
+                <div class="header-title">🚗 Kuryer Paneli</div>
+                <div class="header-subtitle" id="courierInfo">ID yuklanyapti...</div>
+            </div>
+            <button class="refresh-btn" onclick="loadOrders()" title="Yangilash">
+                <svg id="refreshIcon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+                </svg>
+            </button>
+        </div>
+        <div class="header-stats" id="headerStats">
+            <div class="stat-chip paid-chip"><div class="dot"></div><span id="countPaid">0</span> kutmoqda</div>
+            <div class="stat-chip deliv-chip"><div class="dot"></div><span id="countDeliv">0</span> yo'lda</div>
+            <div class="stat-chip done-chip"><div class="dot"></div><span id="countDone">0</span> yetkazildi</div>
         </div>
     </div>
 
-    <div id="accessDeniedScreen" class="fixed inset-0 bg-white hidden flex-col items-center justify-center p-8 z-50">
-        <div class="text-6xl mb-4">🚫</div>
-        <h2 class="text-xl font-bold text-slate-800">{% translate "Ruxsat yo'q" %}</h2>
-        <p class="text-slate-500 text-sm mt-1 text-center">Ushbu panelga kirish kuryerlar uchun cheklangan.</p>
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active-paid" id="tab-paid" onclick="setTab('paid')">
+            🟡 Kutmoqda <span class="badge" id="tbadge-paid">0</span>
+        </button>
+        <button class="tab-btn" id="tab-delivering" onclick="setTab('delivering')">
+            🔵 Yo'lda <span class="badge" id="tbadge-delivering">0</span>
+        </button>
+        <button class="tab-btn" id="tab-done" onclick="setTab('done')">
+            🟢 Yetkazildi <span class="badge" id="tbadge-done">0</span>
+        </button>
     </div>
 
-    <div id="mainApp" class="h-[100dvh] flex flex-col hidden">
-        <div class="shrink-0 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 pt-10 pb-5 shadow-md">
-            <div class="flex items-center justify-between mb-3">
-                <div>
-                    <h1 class="text-xl font-bold">🚗 {% translate "Kuryer Paneli" %}</h1>
-                    <p class="text-amber-100 text-xs mt-0.5">ID: <span id="courierTgIdDisplay">...</span></p>
-                </div>
-                <button onclick="loadOrders()" class="w-9 h-9 bg-white/20 hover:bg-white/30 active:scale-95 transition-all rounded-full flex items-center justify-center">
-                    <svg id="refreshIcon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path>
-                    </svg>
-                </button>
-            </div>
-            <div class="flex items-center gap-2 bg-white/20 rounded-xl px-3 py-2">
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25a7.5 7.5 0 1115 0z"></path></svg>
-                <span class="text-sm font-medium truncate" id="regionDisplay">{% translate "Tuman belgilanmagan" %}</span>
-                <span class="ml-auto text-xs bg-white/20 rounded-full px-2 py-0.5" id="activeCounter">0 ta</span>
-            </div>
-        </div>
+    <!-- Orders -->
+    <div id="ordersContainer"></div>
+</div>
 
-        <div id="successToast" class="shrink-0 bg-green-500 text-white text-center py-2.5 text-sm font-semibold hidden fade-in"></div>
-
-        <div class="flex-1 overflow-y-auto p-4 space-y-4" id="ordersContainer"></div>
+<!-- Order Detail Modal -->
+<div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-title" id="modalTitle">Zakaz ma'lumotlari</div>
+        <div class="modal-body" id="modalBody"></div>
+        <button class="modal-close-btn" onclick="closeModalDirect()">Yopish</button>
     </div>
+</div>
 
-    <script>
-        const t = {
-            ageStr: "{% translate 'yosh' %}",
-            noOrders: "{% translate 'Hozircha buyurtma yo\'q' %}",
-            markDone: "{% translate '✅ Buyurtma yetkazildi' %}",
-            doing: "{% translate 'Yuborilmoqda...' %}",
-            success: "{% translate 'Bajarildi! ✅' %}",
-            yourRegion: "{% translate 'Sizning tumaningiz' %}",
-            ordersCount: "{% translate 'ta buyurtma' %}",
-            addressNote: "{% translate 'Manzil izohi' %}",
-            call: "{% translate 'Qo\'ng\'iroq qilish' %}",
-            delivery: "{% translate 'Yetkazish' %}",
-            pickup: "{% translate 'Pickup' %}",
-            active: "{% translate 'Faol buyurtmalar' %}",
-            completed: "{% translate 'Bajarilgan' %}"
-        };
+<script>
+// ── STATE ──
+let tgId = '8558252080';
+let allOrders = [];
+let currentTab = 'paid';
+let expandedId = null;
 
-        let tgId = "8558252080"; // Logingizdagi default kuryer IDsi qo'yildi
-        let allOrders = [];
-        let doneSet = new Set();
-        let expandedId = null;
+const STATUS_LABEL = {
+    paid:       '⏳ Boshlashni kutmoqda',
+    delivering: '🚗 Yo\'lda',
+    done:       '✅ Yetkazildi',
+};
 
-        if (window.Telegram && window.Telegram.WebApp) {
-            const tg = window.Telegram.WebApp;
-            tg.expand();
-            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                tgId = tg.initDataUnsafe.user.id.toString();
-            }
-        }
-        document.getElementById('courierTgIdDisplay').innerText = tgId;
+// ── TELEGRAM INIT ──
+if (window.Telegram?.WebApp) {
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.enableClosingConfirmation();
+    if (tg.initDataUnsafe?.user?.id) {
+        tgId = String(tg.initDataUnsafe.user.id);
+    }
+}
 
-        document.addEventListener("DOMContentLoaded", function() {
-            checkAuthorization();
-        });
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', init);
 
-        function checkAuthorization() {
-            fetch(`/api/courier/staff/me?tg_id=${tgId}`)
-                .then(r => {
-                    if (r.status === 401) throw new Error("401");
-                    return r.json();
-                })
-                .then(data => {
-                    document.getElementById('loadingScreen').classList.add('hidden');
-                    if (['courier', 'admin'].includes(data.role)) {
-                        if (data.regionName) {
-                            document.getElementById('regionDisplay').innerText = `${t.yourRegion}: ${data.regionName}`;
-                        }
-                        document.getElementById('mainApp').classList.remove('hidden');
-                        loadOrders();
-                    } else {
-                        document.getElementById('accessDeniedScreen').classList.remove('hidden');
-                    }
-                })
-                .catch((err) => {
-                    document.getElementById('loadingScreen').classList.add('hidden');
-                    if(err.message === "401") {
-                        document.getElementById('ordersContainer').innerHTML = `<p class="text-red-500 font-bold text-sm text-center py-6">Backend xatosi: 401 Unauthorized.<br><span class="font-normal text-xs text-slate-500">views.py faylida authentication_classes([]) qo'yilishi shart.</span></p>`;
-                    }
-                    document.getElementById('mainApp').classList.remove('hidden');
-                    loadOrders();
-                });
-        }
+function init() {
+    fetch(`/api/courier/staff/me?tg_id=${tgId}`)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('loadingScreen').style.display = 'none';
 
-        function loadOrders() {
-            const container = document.getElementById('ordersContainer');
-            const refreshIcon = document.getElementById('refreshIcon');
-            refreshIcon.classList.add('animate-spin');
-
-            // Skeleton yuklanish animatsiyasi
-            container.innerHTML = Array.from({ length: 2 }).map(() => `
-                <div class="h-36 bg-white rounded-2xl p-4 space-y-3 shadow-sm border border-slate-100">
-                    <div class="flex justify-between"><div class="skel w-24 h-4 rounded"></div><div class="skel w-6 h-6 rounded-full"></div></div>
-                    <div class="skel w-2/3 h-5 rounded"></div>
-                    <div class="skel w-full h-10 rounded-xl"></div>
-                </div>
-            `).join('');
-
-            fetch(`/api/courier/orders?tg_id=${tgId}`)
-                .then(r => {
-                    if (r.status === 401) throw new Error("401");
-                    return r.json();
-                })
-                .then(orders => {
-                    refreshIcon.classList.remove('animate-spin');
-                    allOrders = orders || [];
-                    renderList();
-                })
-                .catch((err) => {
-                    refreshIcon.classList.remove('animate-spin');
-                    if (err.message === "401") {
-                        container.innerHTML = `<div class="bg-red-50 p-4 rounded-xl text-red-600 text-xs text-center border border-red-200">
-                            <strong>Xatolik: 401 Unauthorized</strong><br>
-                            So'rov rad etildi. views.py faylida decoratorlarni tekshiring.
-                        </div>`;
-                    } else {
-                        container.innerHTML = `<p class="text-red-500 text-sm text-center py-6">Ulanishda xatolik yuz berdi.</p>`;
-                    }
-                });
-        }
-
-        function renderList() {
-            const container = document.getElementById('ordersContainer');
-            
-            const activeOrders = allOrders.filter(o => o.status !== 'courier_done' && !doneSet.has(o.orderId));
-            const completedOrders = allOrders.filter(o => o.status === 'courier_done' || doneSet.has(o.orderId));
-            
-            document.getElementById('activeCounter').innerText = `${activeOrders.length} ${t.ordersCount}`;
-
-            if (allOrders.length === 0) {
-                container.innerHTML = `
-                    <div class="flex flex-col items-center justify-center py-20 text-slate-400">
-                        <div class="text-5xl mb-2">🚚</div>
-                        <p class="text-sm">${t.noOrders}</p>
-                    </div>`;
+            if (!['courier', 'admin'].includes(data.role)) {
+                document.getElementById('accessDeniedScreen').style.display = 'flex';
                 return;
             }
 
-            let html = '';
+            const name = data.firstName ? data.firstName + ' · ' : '';
+            const region = data.regionName ? data.regionName : 'Tuman belgilanmagan';
+            document.getElementById('courierInfo').textContent = `${name}📍 ${region}`;
 
-            // FAOL BUYURTMALAR
-            if (activeOrders.length > 0) {
-                html += `<p class="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">${t.active}</p>`;
-                activeOrders.forEach(order => {
-                    const id = order.orderId;
-                    const rawAddress = order.addressNote || '';
-                    let pureAddress = rawAddress;
-                    let phoneNumber = '';
+            const app = document.getElementById('mainApp');
+            app.style.display = 'flex';
+            loadOrders();
+        })
+        .catch(() => {
+            document.getElementById('loadingScreen').style.display = 'none';
+            const app = document.getElementById('mainApp');
+            app.style.display = 'flex';
+            loadOrders();
+        });
+}
 
-                    if (rawAddress.includes(' | Tel: ')) {
-                        const parts = rawAddress.split(' | Tel: ');
-                        pureAddress = parts[0];
-                        phoneNumber = parts[1];
-                    }
+// ── LOAD ORDERS ──
+function loadOrders() {
+    const container = document.getElementById('ordersContainer');
+    const icon = document.getElementById('refreshIcon');
+    icon.classList.add('spin');
 
-                    const isExpanded = expandedId === id;
+    container.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:12px;padding:16px">
+            ${[1,2].map(() => `
+                <div style="background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+                    <div style="height:4px" class="skel"></div>
+                    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+                        <div class="skel" style="height:12px;width:40%;border-radius:6px"></div>
+                        <div class="skel" style="height:20px;width:65%;border-radius:6px"></div>
+                        <div class="skel" style="height:36px;width:100%;border-radius:10px"></div>
+                        <div class="skel" style="height:44px;width:100%;border-radius:10px"></div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>`;
 
-                    html += `
-                        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden fade-in relative">
-                            <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-amber-500 rounded-l-2xl"></div>
-                            
-                            <div class="p-4 pl-5" onclick="toggleExpand('${id}')">
-                                <div class="flex items-center justify-between">
-                                    <span class="font-mono text-sm font-bold text-amber-700"># ${id}</span>
-                                    <span class="text-slate-300 text-sm">📦</span>
-                                </div>
-                                <div class="text-sm font-bold text-slate-800 mt-1">
-                                    ${order.patientName} <span class="font-normal text-slate-400 text-xs ml-1">${order.patientAge} ${t.ageStr}</span>
-                                </div>
-                                <div class="flex items-center gap-1 mt-2 text-xs text-slate-500">
-                                    📍 <span class="font-semibold text-slate-700">${order.districtName}</span>
-                                </div>
-                            </div>
+    fetch(`/api/courier/orders?tg_id=${tgId}`)
+        .then(r => r.json())
+        .then(orders => {
+            icon.classList.remove('spin');
+            allOrders = Array.isArray(orders) ? orders : [];
+            updateCounts();
+            renderTab();
+        })
+        .catch(() => {
+            icon.classList.remove('spin');
+            container.innerHTML = `
+                <div style="padding:32px;text-align:center">
+                    <div style="font-size:40px;margin-bottom:12px">📡</div>
+                    <div style="font-weight:800;color:#EF4444;margin-bottom:6px">Ulanishda xatolik</div>
+                    <div style="font-size:13px;color:#94A3B8">Internetni tekshirib, qayta urinib ko'ring</div>
+                </div>`;
+        });
+}
 
-                            <div id="details-${id}" class="collapse-anim px-4 pl-5 ${isExpanded ? 'expanded' : ''} border-t border-slate-50">
-                                ${pureAddress ? `
-                                    <div class="text-xs text-slate-600 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100 mb-3">
-                                        <span class="font-bold block mb-0.5 text-slate-400 text-[10px] uppercase tracking-wider">${t.addressNote}</span>
-                                        ${pureAddress}
-                                    </div>
-                                ` : ''}
+// ── COUNTS ──
+function updateCounts() {
+    const tabs = ['paid', 'delivering', 'done'];
+    tabs.forEach(s => {
+        const c = allOrders.filter(o => o.status === s).length;
+        document.getElementById(`countPaid`).textContent   = allOrders.filter(o=>o.status==='paid').length;
+        document.getElementById(`countDeliv`).textContent  = allOrders.filter(o=>o.status==='delivering').length;
+        document.getElementById(`countDone`).textContent   = allOrders.filter(o=>o.status==='done').length;
+        document.getElementById(`tbadge-${s}`).textContent = allOrders.filter(o=>o.status===s).length;
+    });
+}
 
-                                ${phoneNumber ? `
-                                    <a href="tel:${phoneNumber.replace(/\s+/g, '')}" onclick="event.stopPropagation()"
-                                        class="flex items-center gap-2.5 p-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-100 mb-3 active:scale-[0.99] transition-transform">
-                                        <div class="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs">📞</div>
-                                        <div class="flex-1">
-                                            <span class="text-[9px] text-emerald-600/80 block uppercase font-bold">${t.call}</span>
-                                            <span class="text-xs font-bold tracking-wide">${phoneNumber}</span>
-                                        </div>
-                                    </a>
-                                ` : ''}
+// ── TABS ──
+function setTab(tab) {
+    currentTab = tab;
+    expandedId = null;
 
-                                <div class="flex flex-wrap gap-1.5 mb-3">
-                                    ${order.deliverySlot ? `<span class="text-[10px] bg-blue-50 text-blue-700 rounded-full px-2.5 py-0.5 font-medium">🕒 ${t.delivery}: ${order.deliverySlot}</span>` : ''}
-                                    ${order.pickupSlot ? `<span class="text-[10px] bg-purple-50 text-purple-700 rounded-full px-2.5 py-0.5 font-medium">🕒 ${t.pickup}: ${order.pickupSlot}</span>` : ''}
-                                </div>
+    const tabMap = { paid: 'active-paid', delivering: 'active-deliv', done: 'active-done' };
+    ['paid','delivering','done'].forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        btn.className = 'tab-btn';
+        if (t === tab) btn.classList.add(tabMap[t]);
+    });
 
-                                ${order.latitude && order.longitude ? `
-                                    <div class="grid grid-cols-2 gap-2 pt-1">
-                                        <button onclick="event.stopPropagation(); openMap('google', ${order.latitude}, ${order.longitude})" class="h-9 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors">🌐 Google Maps</button>
-                                        <button onclick="event.stopPropagation(); openMap('yandex', ${order.latitude}, ${order.longitude})" class="h-9 rounded-xl bg-orange-50 text-orange-700 text-xs font-bold hover:bg-orange-100 transition-colors">🗺 Yandex Maps</button>
-                                    </div>
-                                ` : ''}
-                            </div>
+    renderTab();
+}
 
-                            <div class="px-4 pb-4 pl-5 pt-2">
-                                <button id="btn-${id}" onclick="event.stopPropagation(); markAsDone('${id}')" 
-                                    class="w-full h-11 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
-                                    ${t.markDone}
-                                </button>
-                            </div>
-                        </div>`;
-                });
-            }
+// ── RENDER ──
+function renderTab() {
+    const container = document.getElementById('ordersContainer');
+    container.style.padding = '16px';
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.gap = '12px';
 
-            // YAKUNLANGAN BUYURTMALAR
-            if (completedOrders.length > 0) {
-                html += `<div class="space-y-2 pt-2">`;
-                html += `<p class="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">${t.completed}</p>`;
-                completedOrders.forEach(order => {
-                    html += `
-                        <div class="bg-white p-3.5 rounded-xl border border-slate-100 opacity-65 flex items-center gap-3 shadow-sm fade-in">
-                            <div class="w-7 h-7 rounded-full bg-green-50 text-green-600 flex items-center justify-center text-sm font-bold shrink-0">✓</div>
-                            <div class="flex-1 min-w-0">
-                                <div class="font-mono text-xs font-bold text-slate-400"># ${order.orderId}</div>
-                                <div class="text-xs text-slate-700 font-medium truncate">
-                                    ${order.patientName} · <span class="text-green-600 font-semibold">Yetkazildi</span>
-                                </div>
-                            </div>
-                            <span class="text-xs text-slate-400 font-medium">${order.districtName}</span>
-                        </div>`;
-                });
-                html += `</div>`;
-            }
+    const filtered = allOrders.filter(o => o.status === currentTab);
 
-            container.innerHTML = html;
+    if (filtered.length === 0) {
+        const msgs = {
+            paid: { icon: '📋', title: 'Yangi zakaz yo\'q', sub: 'To\'langan zakazlar bu yerda chiqadi' },
+            delivering: { icon: '🚗', title: 'Yo\'ldagi zakaz yo\'q', sub: 'Boshlangan zakazlar bu yerda ko\'rinadi' },
+            done: { icon: '✅', title: 'Yetkazilgan zakaz yo\'q', sub: 'Bajarilgan zakazlar bu yerda ko\'rinadi' },
+        };
+        const m = msgs[currentTab];
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">${m.icon}</div>
+                <div class="empty-title">${m.title}</div>
+                <div class="empty-sub">${m.sub}</div>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = filtered.map((o, i) => buildCard(o, i)).join('');
+}
+
+function buildCard(o, animIndex) {
+    const id = o.orderId;
+    const isExpanded = expandedId === id;
+    const statusClass = `status-${o.status}`;
+    const isDone = o.status === 'done';
+
+    const badgeClass = { paid: 'badge-paid', delivering: 'badge-delivering', done: 'badge-done' }[o.status];
+    const badgeIcon  = { paid: '⏳', delivering: '🚗', done: '✅' }[o.status];
+    const badgeText  = { paid: 'Kutmoqda', delivering: 'Yo\'lda', done: 'Yetkazildi' }[o.status];
+
+    // Action buttons
+    let actionBtns = '';
+    if (o.status === 'paid') {
+        actionBtns = `
+            <button class="action-btn btn-info" onclick="event.stopPropagation();openDetail('${id}')" title="Batafsil">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+            </button>
+            <button class="action-btn btn-start" id="btn-start-${id}" onclick="event.stopPropagation();startDelivery('${id}')">
+                🚗 Yo'lga chiqish
+            </button>`;
+    } else if (o.status === 'delivering') {
+        actionBtns = `
+            <button class="action-btn btn-info" onclick="event.stopPropagation();openDetail('${id}')" title="Batafsil">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+            </button>
+            <button class="action-btn btn-done" id="btn-done-${id}" onclick="event.stopPropagation();markDone('${id}')">
+                ✅ Namuna olindi
+            </button>`;
+    }
+
+    const detailsHtml = buildDetails(o);
+
+    return `
+        <div class="order-card ${statusClass} ${isDone ? 'done-card' : ''}" style="animation-delay:${animIndex * 0.05}s">
+            <div class="card-accent"></div>
+            <div class="card-header" onclick="toggleExpand('${id}')">
+                <div class="card-header-top">
+                    <span class="order-id">ZAKAZ #${id}</span>
+                    <span class="status-badge ${badgeClass}">${badgeIcon} ${badgeText}</span>
+                </div>
+                <div class="patient-name">${esc(o.patientName)}</div>
+                <div class="patient-meta">
+                    ${o.patientAge ? o.patientAge + ' yosh' : ''}
+                    ${o.serviceName ? ' · ' + esc(o.serviceName) : ''}
+                    ${o.createdAt ? ' · ' + o.createdAt : ''}
+                </div>
+                <div class="card-location">
+                    <span class="location-icon">📍</span>
+                    <span class="location-text">${esc(o.districtName)}</span>
+                    <span class="chevron ${isExpanded ? 'open' : ''}">▼</span>
+                </div>
+            </div>
+
+            <div class="card-details ${isExpanded ? 'open' : ''}" id="det-${id}">
+                <div class="details-inner">
+                    ${detailsHtml}
+                </div>
+            </div>
+
+            ${!isDone ? `<div class="card-actions">${actionBtns}</div>` : ''}
+        </div>`;
+}
+
+function buildDetails(o) {
+    let html = '';
+
+    if (o.addressNote) {
+        html += `<div class="detail-row">
+            <div class="detail-label">📍 Manzil izohi</div>
+            <div class="detail-value">${esc(o.addressNote)}</div>
+        </div>`;
+    }
+
+    if (o.phone) {
+        html += `
+        <a href="tel:${o.phone.replace(/\s+/g,'')}" onclick="event.stopPropagation()" class="phone-link">
+            <div class="phone-icon">📞</div>
+            <div>
+                <div class="phone-label">Telefon raqam</div>
+                <div class="phone-number">${esc(o.phone)}</div>
+            </div>
+        </a>`;
+    }
+
+    if (o.pickupSlot || o.deliverySlot) {
+        html += `<div class="detail-row">
+            <div class="detail-label">🕒 Vaqt oynasi</div>
+            <div class="detail-value">
+                ${o.pickupSlot ? '⬆️ Olib ketish: ' + o.pickupSlot : ''}
+                ${o.deliverySlot ? (o.pickupSlot ? ' &nbsp;|&nbsp; ' : '') + '📦 Yetkazish: ' + o.deliverySlot : ''}
+            </div>
+        </div>`;
+    }
+
+    if (o.totalPrice) {
+        html += `<div class="detail-row">
+            <div class="detail-label">💰 To'lov miqdori</div>
+            <div class="detail-value" style="color:#059669">${Number(o.totalPrice).toLocaleString()} so'm</div>
+        </div>`;
+    }
+
+    if (o.latitude && o.longitude) {
+        html += `
+        <div style="margin-top:10px;margin-bottom:4px">
+            <div class="detail-label" style="margin-bottom:8px">🗺 Xaritada ochish</div>
+            <div class="map-btns">
+                <button class="map-btn map-google" onclick="event.stopPropagation();openMap('google',${o.latitude},${o.longitude})">
+                    🌐 Google Maps
+                </button>
+                <button class="map-btn map-yandex" onclick="event.stopPropagation();openMap('yandex',${o.latitude},${o.longitude})">
+                    🗺 Yandex Maps
+                </button>
+            </div>
+        </div>`;
+    }
+
+    if (!html) {
+        html = `<div class="detail-row"><div class="detail-value" style="color:var(--c-muted)">Qo'shimcha ma'lumot yo'q</div></div>`;
+    }
+
+    return html;
+}
+
+// ── EXPAND ──
+function toggleExpand(id) {
+    const wasOpen = expandedId === id;
+    expandedId = wasOpen ? null : id;
+
+    // Update only chevrons and open/close without full re-render for smoothness
+    document.querySelectorAll('.chevron').forEach(el => el.classList.remove('open'));
+    document.querySelectorAll('.card-details').forEach(el => el.classList.remove('open'));
+
+    if (!wasOpen) {
+        const chevron = document.querySelector(`[onclick="toggleExpand('${id}')"] .chevron`);
+        const details = document.getElementById(`det-${id}`);
+        if (chevron) chevron.classList.add('open');
+        if (details) details.classList.add('open');
+    }
+}
+
+// ── ACTIONS ──
+function startDelivery(id) {
+    const btn = document.getElementById(`btn-start-${id}`);
+    if (!btn || btn.disabled) return;
+    setBtn(btn, true, '⏳ Yuborilmoqda...');
+
+    fetch(`/api/courier/orders/${id}/start?tg_id=${tgId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('🚗 Yo\'lga chiqdingiz! Bemor xabardor qilindi.');
+            // Optimistic update
+            const order = allOrders.find(o => o.orderId === id);
+            if (order) order.status = 'delivering';
+            updateCounts();
+            setTab('delivering');
+        } else {
+            showToast('⚠️ ' + (data.error || 'Xatolik yuz berdi'));
+            setBtn(btn, false, '🚗 Yo\'lga chiqish');
         }
+    })
+    .catch(() => {
+        showToast('❌ Ulanishda xatolik');
+        setBtn(btn, false, '🚗 Yo\'lga chiqish');
+    });
+}
 
-        function toggleExpand(id) {
-            expandedId = expandedId === id ? null : id;
-            renderList();
+function markDone(id) {
+    const btn = document.getElementById(`btn-done-${id}`);
+    if (!btn || btn.disabled) return;
+    setBtn(btn, true, '⏳ Yuborilmoqda...');
+
+    fetch(`/api/courier/orders/${id}/done?tg_id=${tgId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('✅ Namuna olindi! Bemor xabardor qilindi.');
+            const order = allOrders.find(o => o.orderId === id);
+            if (order) order.status = 'done';
+            updateCounts();
+            setTab('done');
+        } else {
+            showToast('⚠️ ' + (data.error || 'Xatolik yuz berdi'));
+            setBtn(btn, false, '✅ Namuna olindi');
         }
+    })
+    .catch(() => {
+        showToast('❌ Ulanishda xatolik');
+        setBtn(btn, false, '✅ Namuna olindi');
+    });
+}
 
-        function openMap(type, lat, lng) {
-            if (type === 'yandex') {
-                window.open(`https://yandex.uz/maps/?rtext=~${lat},${lng}&rtt=auto`, '_blank');
-            } else {
-                const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-                if (isIOS) {
-                    window.open(`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`, '_blank');
-                } else {
-                    window.open(`http://maps.google.com/?q=${lat},${lng}&travelmode=driving`, '_blank');
-                }
-            }
+function setBtn(btn, disabled, text) {
+    btn.disabled = disabled;
+    btn.textContent = text;
+}
+
+// ── DETAIL MODAL ──
+function openDetail(id) {
+    const o = allOrders.find(o => o.orderId === id);
+    if (!o) return;
+
+    document.getElementById('modalTitle').innerHTML = `
+        <span style="font-size:14px;color:var(--c-muted);font-weight:700">ZAKAZ #${id}</span><br>
+        ${esc(o.patientName)}`;
+
+    let rows = [
+        o.patientAge     ? ['👤 Bemor yoshi',    o.patientAge + ' yosh'] : null,
+        o.serviceName    ? ['🧪 Xizmat',          o.serviceName]          : null,
+        o.districtName   ? ['📍 Tuman',           o.districtName]         : null,
+        o.addressNote    ? ['🏠 Manzil izohi',    o.addressNote]          : null,
+        o.phone          ? ['📞 Telefon',          o.phone]                : null,
+        o.pickupSlot     ? ['⬆️ Olib ketish vaqti', o.pickupSlot]         : null,
+        o.deliverySlot   ? ['📦 Yetkazish vaqti', o.deliverySlot]         : null,
+        o.totalPrice     ? ['💰 To\'lov',         Number(o.totalPrice).toLocaleString() + ' so\'m'] : null,
+        o.createdAt      ? ['🕐 Yaratilgan',       o.createdAt]            : null,
+        ['📊 Holati', STATUS_LABEL[o.status] || o.status],
+    ].filter(Boolean);
+
+    document.getElementById('modalBody').innerHTML = rows.map(([label, value]) => `
+        <div class="modal-row">
+            <div class="modal-label">${label}</div>
+            <div class="modal-value">${esc(String(value))}</div>
+        </div>`).join('') + (o.latitude && o.longitude ? `
+        <div style="margin-top:12px">
+            <div class="modal-label" style="margin-bottom:8px">🗺 Xaritada ochish</div>
+            <div class="map-btns">
+                <button class="map-btn map-google" onclick="openMap('google',${o.latitude},${o.longitude})">🌐 Google Maps</button>
+                <button class="map-btn map-yandex" onclick="openMap('yandex',${o.latitude},${o.longitude})">🗺 Yandex Maps</button>
+            </div>
+        </div>` : '');
+
+    document.getElementById('detailModal').classList.add('open');
+}
+
+function closeModal(e) {
+    if (e.target === document.getElementById('detailModal')) closeModalDirect();
+}
+function closeModalDirect() {
+    document.getElementById('detailModal').classList.remove('open');
+}
+
+// ── UTILS ──
+function openMap(type, lat, lng) {
+    if (type === 'yandex') {
+        window.open(`https://yandex.uz/maps/?rtext=~${lat},${lng}&rtt=auto`, '_blank');
+    } else {
+        const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+            window.open(`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`, '_blank');
+        } else {
+            window.open(`http://maps.google.com/?q=${lat},${lng}&travelmode=driving`, '_blank');
         }
+    }
+}
 
-        function markAsDone(id) {
-            const btn = document.getElementById(`btn-${id}`);
-            btn.disabled = true;
-            btn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> ${t.doing}`;
+let toastTimeout;
+function showToast(msg) {
+    clearTimeout(toastTimeout);
+    document.querySelectorAll('.toast').forEach(el => el.remove());
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    toastTimeout = setTimeout(() => el.remove(), 3000);
+}
 
-            fetch(`/api/courier/orders/${id}/done?tg_id=${tgId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(async r => {
-                if (!r.ok) {
-                    const err = await r.json().catch(() => ({}));
-                    throw new Error(err.error || "Xatolik yuz berdi");
-                }
-                return r.json();
-            })
-            .then(() => {
-                doneSet.add(id);
-                showToast(t.success);
-                renderList();
-            })
-            .catch(err => {
-                alert(err.message);
-                renderList();
-            });
-        }
-
-        function showToast(msg) {
-            const toast = document.getElementById('successToast');
-            toast.innerText = msg;
-            toast.classList.remove('hidden');
-            setTimeout(() => { toast.classList.add('hidden'); }, 2500);
-        }
-    </script>
+function esc(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+</script>
 </body>
 </html>

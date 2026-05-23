@@ -18,8 +18,8 @@ if DEBUG is not None:
 else:
     DEBUG = False
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "manor-estate-secretariat-strategy.trycloudflare.com"]
-CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1", "https://localhost:8000", "https://manor-estate-secretariat-strategy.trycloudflare.com"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "methods-slight-thumbnails-nationally.trycloudflare.com"]
+CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1", "https://localhost:8000", "https://methods-slight-thumbnails-nationally.trycloudflare.com"]
 
 INSTALLED_APPS = [*THIRD_PARTY_APPS, *DEFAULT_APPS, *PROJECT_APPS]
 

@@ -47,6 +47,7 @@ def main():
 
     # Inline hanlder
     app.add_handler(CallbackQueryHandler(start, pattern=r"^Main_Menu$"))
+    app.add_handler(CallbackQueryHandler(admin_menyu, pattern=r"^admin_menu$"))
     app.add_handler(CallbackQueryHandler(bot_stats, pattern=r"^botstats$"))
     app.add_handler(CallbackQueryHandler(start, pattern=r"^cancel$"))
     app.add_handler(CallbackQueryHandler(start_delete_mandatory, pattern=r"^Del_mandatory$"))

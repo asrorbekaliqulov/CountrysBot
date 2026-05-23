@@ -107,9 +107,9 @@ STATUS_MESSAGES = {
         "Iltimos, tayyor bo'ling!"
     ),
     'done': (
-        "🧪 *Namuna olindi!*\n\n"
+        "🧪 *Konteyner yetkazildi!*\n\n"
         "📋 Buyurtma #{order_id}\n"
-        "Kuryer namunani laboratoriyaga yetkazdi.\n\n"
+        "Kuryer konteynerni yetkazidi.\n\n"
         "Tahlil natijasi tayyor bo'lgach xabardor qilamiz. ⏳"
     ),
     'result_pending': (
@@ -190,9 +190,9 @@ def build_message(status: str, order) -> str | None:
 def get_patient_tg_id(order) -> str | None:
     """Buyurtmaga bog'liq bemorning Telegram ID sini qaytaradi"""
     if hasattr(order, 'user') and order.user:
-        return str(order.user.tg_id)
+        return str(order.user.user_id)
     if hasattr(order, 'telegram_user') and order.telegram_user:
-        return str(order.telegram_user.tg_id)
+        return str(order.telegram_user.user_id)
     return None
 
 

@@ -126,7 +126,7 @@ async def get_main_menu_keyboard(
         keyboard.append([
             InlineKeyboardButton(
                 text=ADMIN_BTN.get(lang, ADMIN_BTN["uz"]),
-                callback_data="admin_panel",
+                callback_data="admin_menu",
             )
         ])
 
@@ -188,7 +188,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── 5. Rol bo'yicha yo'naltirish ─────────────────────────────────────────────
     #  Kuryer va shifokorlar uchun mos panel (callback_data orqali ochiladi)
     if user_role == "courier":
-        webapp_url = f"{str(WEB_APP_URL)}api/courier/panel/?lang={lang}",
+        webapp_url = f"{str(WEB_APP_URL)}api/courier/?lang={lang}",
         print(f"Courier {tg_user.id} uchun panel URL: {webapp_url}")
         # WebApp URL-ga til parametrini qo'shamiz
         connector = "&" if "?" in webapp_url else "?"
@@ -201,7 +201,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "🚗 Kuryer paneli" if lang == "uz" else
                 "🚗 Панель курьера" if lang == "ru" else
                 "🚗 Courier panel",
-                web_app=WebAppInfo(url=str(f"https://manor-estate-secretariat-strategy.trycloudflare.com/api/courier/panel/?lang=uz&tg_id={user_id}")),
+                web_app=WebAppInfo(url=str(f"https://methods-slight-thumbnails-nationally.trycloudflare.com/api/courier/?lang=uz&tg_id={user_id}")),
             )
         ]])
         await context.bot.send_message(
@@ -228,7 +228,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "👨‍⚕️ Shifokor paneli" if lang == "uz" else
                 "👨‍⚕️ Панель врача" if lang == "ru" else
                 "👨‍⚕️ Doctor panel",
-                web_app=WebAppInfo(url=str(f"https://manor-estate-secretariat-strategy.trycloudflare.com/api/doctor/panel/?lang=uz&tg_id={user_id}")),
+                web_app=WebAppInfo(url=str(f"https://methods-slight-thumbnails-nationally.trycloudflare.com/api/doctor/panel/?lang=uz&tg_id={user_id}")),
             )
         ]])
         await context.bot.send_message(

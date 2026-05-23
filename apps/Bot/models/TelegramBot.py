@@ -22,7 +22,7 @@ class TelegramUserManager(BaseUserManager):
         extra_fields.setdefault("is_admin", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("role", "admin")
-        return self.create_user(tg_id, lang, **extra_fields)
+        return self.create_user(user_id, lang, **extra_fields)
 
 
 def _generate_patient_id():

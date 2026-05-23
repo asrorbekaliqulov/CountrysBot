@@ -17,6 +17,7 @@ from apps.Bot.views.courier import (
     courier_staff_me_api,
     courier_orders_api,
     courier_order_done_api,
+    courier_order_start_delivery_api
 )
 
 # ── Yagona Router ─────────────────────────────────────────────────────────────
@@ -72,8 +73,11 @@ urlpatterns = [
     # GET  /api/courier/staff/me?tg_id=...
     # GET  /api/courier/orders?tg_id=...
     # POST /api/courier/orders/<order_id>/done?tg_id=...
-    path('courier/panel/',                         courier_panel_view,      name='courier_panel'),
-    path('courier/staff/me',                       courier_staff_me_api,    name='courier_staff_me'),
-    path('courier/orders',                         courier_orders_api,      name='courier_orders'),
-    path('courier/orders/<str:order_id>/done',     courier_order_done_api,  name='courier_order_done'),
+    path('courier/', courier_panel_view, name='courier_panel'),
+ 
+    # API endpoints
+    path('courier/staff/me', courier_staff_me_api, name='courier_staff_me'),
+    path('courier/orders', courier_orders_api, name='courier_orders'),
+    path('courier/orders/<int:order_id>/start', courier_order_start_delivery_api, name='courier_order_start'),
+    path('courier/orders/<int:order_id>/done', courier_order_done_api, name='courier_order_done'),
 ]
