@@ -1,0 +1,335 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="{{ request.LANGUAGE_CODE|default:'uz' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{% translate "Kuryer Paneli" %}</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.2s ease-out forwards; }
+        .collapse-anim { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); max-height: 0; opacity: 0; overflow: hidden; }
+        .collapse-anim.expanded { max-height: 500px; opacity: 1; padding-top: 12px; padding-bottom: 12px; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+        
+        .skel { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200% 100%; animation: sk 1.4s infinite; }
+        @keyframes sk { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans antialiased text-slate-900 select-none">
+
+    <div id="loadingScreen" class="fixed inset-0 bg-white flex items-center justify-center z-50">
+        <div class="text-center space-y-3">
+            <svg class="animate-spin h-8 w-8 text-amber-500 mx-auto" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-slate-500 text-sm">{% translate "Yuklanmoqda..." %}</p>
+        </div>
+    </div>
+
+    <div id="accessDeniedScreen" class="fixed inset-0 bg-white hidden flex-col items-center justify-center p-8 z-50">
+        <div class="text-6xl mb-4">🚫</div>
+        <h2 class="text-xl font-bold text-slate-800">{% translate "Ruxsat yo'q" %}</h2>
+        <p class="text-slate-500 text-sm mt-1 text-center">Ushbu panelga kirish kuryerlar uchun cheklangan.</p>
+    </div>
+
+    <div id="mainApp" class="h-[100dvh] flex flex-col hidden">
+        <div class="shrink-0 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 pt-10 pb-5 shadow-md">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h1 class="text-xl font-bold">🚗 {% translate "Kuryer Paneli" %}</h1>
+                    <p class="text-amber-100 text-xs mt-0.5">ID: <span id="courierTgIdDisplay">...</span></p>
+                </div>
+                <button onclick="loadOrders()" class="w-9 h-9 bg-white/20 hover:bg-white/30 active:scale-95 transition-all rounded-full flex items-center justify-center">
+                    <svg id="refreshIcon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="flex items-center gap-2 bg-white/20 rounded-xl px-3 py-2">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25a7.5 7.5 0 1115 0z"></path></svg>
+                <span class="text-sm font-medium truncate" id="regionDisplay">{% translate "Tuman belgilanmagan" %}</span>
+                <span class="ml-auto text-xs bg-white/20 rounded-full px-2 py-0.5" id="activeCounter">0 ta</span>
+            </div>
+        </div>
+
+        <div id="successToast" class="shrink-0 bg-green-500 text-white text-center py-2.5 text-sm font-semibold hidden fade-in"></div>
+
+        <div class="flex-1 overflow-y-auto p-4 space-y-4" id="ordersContainer"></div>
+    </div>
+
+    <script>
+        const t = {
+            ageStr: "{% translate 'yosh' %}",
+            noOrders: "{% translate 'Hozircha buyurtma yo\'q' %}",
+            markDone: "{% translate '✅ Buyurtma yetkazildi' %}",
+            doing: "{% translate 'Yuborilmoqda...' %}",
+            success: "{% translate 'Bajarildi! ✅' %}",
+            yourRegion: "{% translate 'Sizning tumaningiz' %}",
+            ordersCount: "{% translate 'ta buyurtma' %}",
+            addressNote: "{% translate 'Manzil izohi' %}",
+            call: "{% translate 'Qo\'ng\'iroq qilish' %}",
+            delivery: "{% translate 'Yetkazish' %}",
+            pickup: "{% translate 'Pickup' %}",
+            active: "{% translate 'Faol buyurtmalar' %}",
+            completed: "{% translate 'Bajarilgan' %}"
+        };
+
+        let tgId = "8558252080"; // Logingizdagi default kuryer IDsi qo'yildi
+        let allOrders = [];
+        let doneSet = new Set();
+        let expandedId = null;
+
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.expand();
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                tgId = tg.initDataUnsafe.user.id.toString();
+            }
+        }
+        document.getElementById('courierTgIdDisplay').innerText = tgId;
+
+        document.addEventListener("DOMContentLoaded", function() {
+            checkAuthorization();
+        });
+
+        function checkAuthorization() {
+            fetch(`/api/courier/staff/me?tg_id=${tgId}`)
+                .then(r => {
+                    if (r.status === 401) throw new Error("401");
+                    return r.json();
+                })
+                .then(data => {
+                    document.getElementById('loadingScreen').classList.add('hidden');
+                    if (['courier', 'admin'].includes(data.role)) {
+                        if (data.regionName) {
+                            document.getElementById('regionDisplay').innerText = `${t.yourRegion}: ${data.regionName}`;
+                        }
+                        document.getElementById('mainApp').classList.remove('hidden');
+                        loadOrders();
+                    } else {
+                        document.getElementById('accessDeniedScreen').classList.remove('hidden');
+                    }
+                })
+                .catch((err) => {
+                    document.getElementById('loadingScreen').classList.add('hidden');
+                    if(err.message === "401") {
+                        document.getElementById('ordersContainer').innerHTML = `<p class="text-red-500 font-bold text-sm text-center py-6">Backend xatosi: 401 Unauthorized.<br><span class="font-normal text-xs text-slate-500">views.py faylida authentication_classes([]) qo'yilishi shart.</span></p>`;
+                    }
+                    document.getElementById('mainApp').classList.remove('hidden');
+                    loadOrders();
+                });
+        }
+
+        function loadOrders() {
+            const container = document.getElementById('ordersContainer');
+            const refreshIcon = document.getElementById('refreshIcon');
+            refreshIcon.classList.add('animate-spin');
+
+            // Skeleton yuklanish animatsiyasi
+            container.innerHTML = Array.from({ length: 2 }).map(() => `
+                <div class="h-36 bg-white rounded-2xl p-4 space-y-3 shadow-sm border border-slate-100">
+                    <div class="flex justify-between"><div class="skel w-24 h-4 rounded"></div><div class="skel w-6 h-6 rounded-full"></div></div>
+                    <div class="skel w-2/3 h-5 rounded"></div>
+                    <div class="skel w-full h-10 rounded-xl"></div>
+                </div>
+            `).join('');
+
+            fetch(`/api/courier/orders?tg_id=${tgId}`)
+                .then(r => {
+                    if (r.status === 401) throw new Error("401");
+                    return r.json();
+                })
+                .then(orders => {
+                    refreshIcon.classList.remove('animate-spin');
+                    allOrders = orders || [];
+                    renderList();
+                })
+                .catch((err) => {
+                    refreshIcon.classList.remove('animate-spin');
+                    if (err.message === "401") {
+                        container.innerHTML = `<div class="bg-red-50 p-4 rounded-xl text-red-600 text-xs text-center border border-red-200">
+                            <strong>Xatolik: 401 Unauthorized</strong><br>
+                            So'rov rad etildi. views.py faylida decoratorlarni tekshiring.
+                        </div>`;
+                    } else {
+                        container.innerHTML = `<p class="text-red-500 text-sm text-center py-6">Ulanishda xatolik yuz berdi.</p>`;
+                    }
+                });
+        }
+
+        function renderList() {
+            const container = document.getElementById('ordersContainer');
+            
+            const activeOrders = allOrders.filter(o => o.status !== 'courier_done' && !doneSet.has(o.orderId));
+            const completedOrders = allOrders.filter(o => o.status === 'courier_done' || doneSet.has(o.orderId));
+            
+            document.getElementById('activeCounter').innerText = `${activeOrders.length} ${t.ordersCount}`;
+
+            if (allOrders.length === 0) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-20 text-slate-400">
+                        <div class="text-5xl mb-2">🚚</div>
+                        <p class="text-sm">${t.noOrders}</p>
+                    </div>`;
+                return;
+            }
+
+            let html = '';
+
+            // FAOL BUYURTMALAR
+            if (activeOrders.length > 0) {
+                html += `<p class="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">${t.active}</p>`;
+                activeOrders.forEach(order => {
+                    const id = order.orderId;
+                    const rawAddress = order.addressNote || '';
+                    let pureAddress = rawAddress;
+                    let phoneNumber = '';
+
+                    if (rawAddress.includes(' | Tel: ')) {
+                        const parts = rawAddress.split(' | Tel: ');
+                        pureAddress = parts[0];
+                        phoneNumber = parts[1];
+                    }
+
+                    const isExpanded = expandedId === id;
+
+                    html += `
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden fade-in relative">
+                            <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-amber-500 rounded-l-2xl"></div>
+                            
+                            <div class="p-4 pl-5" onclick="toggleExpand('${id}')">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-mono text-sm font-bold text-amber-700"># ${id}</span>
+                                    <span class="text-slate-300 text-sm">📦</span>
+                                </div>
+                                <div class="text-sm font-bold text-slate-800 mt-1">
+                                    ${order.patientName} <span class="font-normal text-slate-400 text-xs ml-1">${order.patientAge} ${t.ageStr}</span>
+                                </div>
+                                <div class="flex items-center gap-1 mt-2 text-xs text-slate-500">
+                                    📍 <span class="font-semibold text-slate-700">${order.districtName}</span>
+                                </div>
+                            </div>
+
+                            <div id="details-${id}" class="collapse-anim px-4 pl-5 ${isExpanded ? 'expanded' : ''} border-t border-slate-50">
+                                ${pureAddress ? `
+                                    <div class="text-xs text-slate-600 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100 mb-3">
+                                        <span class="font-bold block mb-0.5 text-slate-400 text-[10px] uppercase tracking-wider">${t.addressNote}</span>
+                                        ${pureAddress}
+                                    </div>
+                                ` : ''}
+
+                                ${phoneNumber ? `
+                                    <a href="tel:${phoneNumber.replace(/\s+/g, '')}" onclick="event.stopPropagation()"
+                                        class="flex items-center gap-2.5 p-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-100 mb-3 active:scale-[0.99] transition-transform">
+                                        <div class="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs">📞</div>
+                                        <div class="flex-1">
+                                            <span class="text-[9px] text-emerald-600/80 block uppercase font-bold">${t.call}</span>
+                                            <span class="text-xs font-bold tracking-wide">${phoneNumber}</span>
+                                        </div>
+                                    </a>
+                                ` : ''}
+
+                                <div class="flex flex-wrap gap-1.5 mb-3">
+                                    ${order.deliverySlot ? `<span class="text-[10px] bg-blue-50 text-blue-700 rounded-full px-2.5 py-0.5 font-medium">🕒 ${t.delivery}: ${order.deliverySlot}</span>` : ''}
+                                    ${order.pickupSlot ? `<span class="text-[10px] bg-purple-50 text-purple-700 rounded-full px-2.5 py-0.5 font-medium">🕒 ${t.pickup}: ${order.pickupSlot}</span>` : ''}
+                                </div>
+
+                                ${order.latitude && order.longitude ? `
+                                    <div class="grid grid-cols-2 gap-2 pt-1">
+                                        <button onclick="event.stopPropagation(); openMap('google', ${order.latitude}, ${order.longitude})" class="h-9 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors">🌐 Google Maps</button>
+                                        <button onclick="event.stopPropagation(); openMap('yandex', ${order.latitude}, ${order.longitude})" class="h-9 rounded-xl bg-orange-50 text-orange-700 text-xs font-bold hover:bg-orange-100 transition-colors">🗺 Yandex Maps</button>
+                                    </div>
+                                ` : ''}
+                            </div>
+
+                            <div class="px-4 pb-4 pl-5 pt-2">
+                                <button id="btn-${id}" onclick="event.stopPropagation(); markAsDone('${id}')" 
+                                    class="w-full h-11 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
+                                    ${t.markDone}
+                                </button>
+                            </div>
+                        </div>`;
+                });
+            }
+
+            // YAKUNLANGAN BUYURTMALAR
+            if (completedOrders.length > 0) {
+                html += `<div class="space-y-2 pt-2">`;
+                html += `<p class="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">${t.completed}</p>`;
+                completedOrders.forEach(order => {
+                    html += `
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-100 opacity-65 flex items-center gap-3 shadow-sm fade-in">
+                            <div class="w-7 h-7 rounded-full bg-green-50 text-green-600 flex items-center justify-center text-sm font-bold shrink-0">✓</div>
+                            <div class="flex-1 min-w-0">
+                                <div class="font-mono text-xs font-bold text-slate-400"># ${order.orderId}</div>
+                                <div class="text-xs text-slate-700 font-medium truncate">
+                                    ${order.patientName} · <span class="text-green-600 font-semibold">Yetkazildi</span>
+                                </div>
+                            </div>
+                            <span class="text-xs text-slate-400 font-medium">${order.districtName}</span>
+                        </div>`;
+                });
+                html += `</div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function toggleExpand(id) {
+            expandedId = expandedId === id ? null : id;
+            renderList();
+        }
+
+        function openMap(type, lat, lng) {
+            if (type === 'yandex') {
+                window.open(`https://yandex.uz/maps/?rtext=~${lat},${lng}&rtt=auto`, '_blank');
+            } else {
+                const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+                if (isIOS) {
+                    window.open(`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`, '_blank');
+                } else {
+                    window.open(`http://maps.google.com/?q=${lat},${lng}&travelmode=driving`, '_blank');
+                }
+            }
+        }
+
+        function markAsDone(id) {
+            const btn = document.getElementById(`btn-${id}`);
+            btn.disabled = true;
+            btn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> ${t.doing}`;
+
+            fetch(`/api/courier/orders/${id}/done?tg_id=${tgId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(async r => {
+                if (!r.ok) {
+                    const err = await r.json().catch(() => ({}));
+                    throw new Error(err.error || "Xatolik yuz berdi");
+                }
+                return r.json();
+            })
+            .then(() => {
+                doneSet.add(id);
+                showToast(t.success);
+                renderList();
+            })
+            .catch(err => {
+                alert(err.message);
+                renderList();
+            });
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('successToast');
+            toast.innerText = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => { toast.classList.add('hidden'); }, 2500);
+        }
+    </script>
+</body>
+</html>

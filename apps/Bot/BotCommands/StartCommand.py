@@ -16,31 +16,15 @@ from ..decorators import typing_action, mandatory_channel_required
 # ─── WebApp URL ────────────────────────────────────────────────────────────────
 WEB_APP_URL = os.getenv(
     "WEB_APP_URL",
-    "https://pen-taylor-masters-attach.trycloudflare.com/api/webapp/wizard/"
+    "https://manor-estate-secretariat-strategy.trycloudflare.com/"
 )
 
 # ─── TRANSLATIONS ──────────────────────────────────────────────────────────────
 MESSAGES = {
-    # /start bosgandagi salomlashish matni
     "welcome": {
-        "uz": (
-            "👋 Xush kelibsiz!\n\n"
-            "🏥 <b>N-MedHomeLab</b> — uy sharoitida professional tibbiy tahlil xizmati.\n"
-            "Kuryer namunangizni olib ketadi, natija sizga yuboriladi.\n\n"
-            "Quyidagilardan birini tanlang 👇"
-        ),
-        "ru": (
-            "👋 Добро пожаловать!\n\n"
-            "🏥 <b>N-MedHomeLab</b> — профессиональный медицинский анализ на дому.\n"
-            "Курьер заберёт образец, результат придёт вам.\n\n"
-            "Выберите нужное 👇"
-        ),
-        "en": (
-            "👋 Welcome!\n\n"
-            "🏥 <b>N-MedHomeLab</b> — professional home medical analysis.\n"
-            "A courier picks up your sample, results come to you.\n\n"
-            "Please choose below 👇"
-        ),
+        "uz": "👋 Xush kelibsiz!\n\n🏥 N-MedHomeLab — uy sharoitida professional tibbiy tahlil xizmati.\nKuryerimiz sizga maxsus konteynerni yetkazib beradi, tahlil natijasini esa bot orqali onlayn tarzda qulay olasiz.\n\nQuyidagilardan birini tanlang 👇",
+        "ru": "👋 Добро пожаловать!\n\n🏥 N-MedHomeLab — профессиональные медицинские анализы на дому.\nКурьер доставит вам специальный контейнер, а результаты анализов вы сможете удобно получить онлайн прямо через бот.\n\nВыберите один из вариантов 👇",
+        "en": "👋 Welcome!\n\n🏥 <b>N-MedHomeLab</b> — professional home medical analysis.\nA courier will deliver a special container to you, and you can conveniently receive your test results online via the bot.\n\nPlease choose one of the options below 👇"
     },
 }
 
@@ -90,7 +74,7 @@ def _clean_lang(lang: str) -> str:
 
 async def get_main_menu_keyboard(
     user_lang: str = "uz",
-    webapp_url: str = WEB_APP_URL,
+    webapp_url: str = f"{WEB_APP_URL}api/webapp/wizard/",
     is_admin: bool = False,
     user_id: int = None,
 ) -> InlineKeyboardMarkup:
@@ -191,7 +175,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_admin  = False
 
     lang = _clean_lang(user_lang)
-
+    
     # ── 4. Admin uchun maxsus tizim xabari (eski bot bilan bir xil) ──────────────
     if is_admin:
         await context.bot.send_message(
@@ -200,16 +184,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=remove_markup,
             parse_mode="html",
         )
-
+    user_id = user.user_id if user else None
     # ── 5. Rol bo'yicha yo'naltirish ─────────────────────────────────────────────
     #  Kuryer va shifokorlar uchun mos panel (callback_data orqali ochiladi)
     if user_role == "courier":
-        kb = InlineKeyboardMarkup([[
+        webapp_url = f"{str(WEB_APP_URL)}api/courier/panel/?lang={lang}",
+        print(f"Courier {tg_user.id} uchun panel URL: {webapp_url}")
+        # WebApp URL-ga til parametrini qo'shamiz
+        connector = "&" if "?" in webapp_url else "?"
+        full_url = f"{webapp_url}{connector}lang={lang}"
+        if user_id:
+            full_url += f"&tg_id={user_id}"
+
+        kb = InlineKeyboardMarkup([ [
             InlineKeyboardButton(
                 "🚗 Kuryer paneli" if lang == "uz" else
                 "🚗 Панель курьера" if lang == "ru" else
                 "🚗 Courier panel",
-                callback_data="courier_panel",
+                web_app=WebAppInfo(url=str(f"https://manor-estate-secretariat-strategy.trycloudflare.com/api/courier/panel/?lang=uz&tg_id={user_id}")),
             )
         ]])
         await context.bot.send_message(
@@ -225,12 +217,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     if user_role == "doctor":
+        #     # WebApp URL-ga til parametrini qo'shamiz
+        # connector = "&" if "?" in webapp_url else "?"
+        # full_url = f"{webapp_url}{connector}lang={lang}"
+        # if user_id:
+        #     full_url += f"&tg_id={user_id}"
+
         kb = InlineKeyboardMarkup([[
             InlineKeyboardButton(
                 "👨‍⚕️ Shifokor paneli" if lang == "uz" else
                 "👨‍⚕️ Панель врача" if lang == "ru" else
                 "👨‍⚕️ Doctor panel",
-                callback_data="doctor_panel",
+                web_app=WebAppInfo(url=str(f"https://manor-estate-secretariat-strategy.trycloudflare.com/api/doctor/panel/?lang=uz&tg_id={user_id}")),
             )
         ]])
         await context.bot.send_message(
@@ -248,7 +246,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── 6. Oddiy foydalanuvchi — asosiy menyu ────────────────────────────────────
     reply_markup = await get_main_menu_keyboard(
         user_lang=lang,
-        webapp_url=WEB_APP_URL,
+        webapp_url=f"{WEB_APP_URL}api/webapp/wizard/",
         is_admin=is_admin,
         user_id=tg_user.id,
     )

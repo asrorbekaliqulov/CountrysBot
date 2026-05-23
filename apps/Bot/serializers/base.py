@@ -19,7 +19,7 @@ class RegionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Region
-        fields = ['id', 'name', 'json_id', 'districts']
+        fields = ['id', 'name', 'districts']
 
 # --- Users ---
 class TelegramUserSerializer(serializers.ModelSerializer):

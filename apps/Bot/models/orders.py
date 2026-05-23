@@ -29,7 +29,15 @@ class Order(models.Model):
     PATIENT_TYPE_CHOICES = [('adult', 'Katta yoshli'), ('child', 'Bola')]
     GENDER_CHOICES = [('male', 'Erkak'), ('female', 'Ayol')]
     TIMING_CHOICES = [('morning', 'Ertalab'), ('day', 'Kundan keyin'), ('evening', 'Kechki payt'), ('irregular', 'Noma`lum')]
-    STATUS_CHOICES = [('pending', 'Kutilmoqda'), ('paid', 'To`langan'), ('delivering', 'Yo`lda'), ('done', 'Yetkazildi'), ('canceled', 'Bekor qilindi')]
+    STATUS_CHOICES = [
+        ('pending', 'Kutilmoqda'),
+        ('paid', 'To`langan'),
+        ('delivering', 'Yo`lda'),
+        ('done', 'Yetkazildi'),  # Kuryer analizni olib keldi / topshirdi
+        ('result_pending', 'Natija kutilmoqda'),  # Laboratoriya tahlil jarayoni
+        ('result_sent', 'Natija jo`natildi'),  # Mijozga PDF/Natija yuborildi
+        ('canceled', 'Bekor qilindi')
+    ]
 
     user = models.ForeignKey(TelegramUser, on_delete=models.CASCADE, related_name="web_orders", null=True, blank=True)
     service = models.ForeignKey(Service, on_delete=models.PROTECT, verbose_name="Tanlangan xizmat", null=True, blank=True)

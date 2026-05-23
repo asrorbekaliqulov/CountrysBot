@@ -18,8 +18,8 @@ if DEBUG is not None:
 else:
     DEBUG = False
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "pen-taylor-masters-attach.trycloudflare.com"]
-CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1", "https://localhost:8000", "https://pen-taylor-masters-attach.trycloudflare.com"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "manor-estate-secretariat-strategy.trycloudflare.com"]
+CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1", "https://localhost:8000", "https://manor-estate-secretariat-strategy.trycloudflare.com"]
 
 INSTALLED_APPS = [*THIRD_PARTY_APPS, *DEFAULT_APPS, *PROJECT_APPS]
 
@@ -202,20 +202,20 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Faqat dev muhitida
 
 # ─── TELEGRAM ─────────────────────────────────────────────────────────────────
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 TELEGRAM_CHANNEL_ID = os.environ.get("TELEGRAM_CHANNEL_ID", "-1001234567890")
 TELEGRAM_ADMIN_IDS = [
     int(x.strip())
     for x in os.environ.get("TELEGRAM_ADMIN_IDS", "").split(",")
     if x.strip().isdigit()
 ]
-WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://pen-taylor-masters-attach.trycloudflare.com")
+WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://calibration-powers-herbs-hose.trycloudflare.com")
 
 # ─── TSPAY ────────────────────────────────────────────────────────────────────
 TSPAY_MERCHANT_ID = os.environ.get("TSPAY_MERCHANT_ID", "0f039e001bcd4020")
 TSPAY_SECRET_KEY  = os.environ.get("TSPAY_SECRET_KEY", "7bb7eb8cf4424472e1ef9fe46cc1c66565c8b445202adb01")
 TSPAY_BASE_URL    = "https://api.tspay.uz"
-WEBAPP_BASE_URL   = "https://pen-taylor-masters-attach.trycloudflare.com"
+WEBAPP_BASE_URL   = "https://calibration-powers-herbs-hose.trycloudflare.com"
 # ─── CELERY ───────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL       = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND   = os.environ.get("REDIS_URL", "redis://localhost:6379/0")

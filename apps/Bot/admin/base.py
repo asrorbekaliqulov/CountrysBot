@@ -183,14 +183,13 @@ class OrderAdmin(ModelAdmin):
 @admin.register(Region)
 class RegionAdmin(ModelAdmin):
     """Viloyatlar boshqaruvi"""
-    list_display = ('id', 'name', 'json_id', 'districts_count')
-    search_fields = ('name', 'json_id')
+    list_display = ('id', 'name', 'districts_count')
+    search_fields = ('name',)
     inlines = [DistrictInline]
 
     @display(description="Tumanlar soni")
     def districts_count(self, obj):
         return obj.districts.count()
-
 
 @admin.register(District)
 class DistrictAdmin(ModelAdmin):
@@ -205,7 +204,7 @@ class DistrictAdmin(ModelAdmin):
 
     fieldsets = (
         ("Hududiy bog'liqlik", {
-            'fields': ('region', 'name', 'json_id'),
+            'fields': ('region', 'name'),
         }),
         ("Xizmat sozlamalari", {
             'fields': ('is_active', 'delivery_price'),
@@ -217,7 +216,9 @@ class DistrictAdmin(ModelAdmin):
 
     @display(description="Yetkazish narxi")
     def delivery_price_display(self, obj):
-        return f"{obj.delivery_price:,} so'm".replace(",", " ")
+        if obj.delivery_price:
+            return f"{obj.delivery_price:,} so'm".replace(",", " ")
+        return "0 so'm"
 
     @display(description="Geo Holati", boolean=True)
     def geo_fetched_badge(self, obj):
@@ -227,7 +228,12 @@ class DistrictAdmin(ModelAdmin):
     def coordinates_display(self, obj):
         if obj.latitude and obj.longitude:
             return f"{obj.latitude:.4f}, {obj.longitude:.4f}"
-        return format_html('<span class="text-red-500 font-medium text-xs">Koordinata yo\'q</span>')
+        
+        # 👑 TO'G'RILANDI: HTML ichiga xavfsiz qiymat joylash uchun {} va argument berildi
+        return format_html(
+            '<span class="text-red-500 font-medium text-xs">{}</span>', 
+            "Koordinata yo'q"
+        )
 
     def save_model(self, request, obj, form, change):
         if not change or 'name' in form.changed_data:
@@ -256,8 +262,7 @@ class DistrictAdmin(ModelAdmin):
             f"{queryset.count()} tuman tekshirildi. {success_count} tasi yangilandi.", 
             messages.SUCCESS
         )
-
-
+        
 @admin.register(BotSetting)
 class BotSettingAdmin(ModelAdmin):
     """Bot sozlamalari"""

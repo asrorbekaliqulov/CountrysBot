@@ -12,7 +12,7 @@ logger = logging.getLogger("apps.regions")
 class Region(models.Model):
     """Viloyat / Respublika"""
     name   = models.CharField(max_length=200, verbose_name="Nomi")
-    json_id = models.IntegerField(unique=True, verbose_name="JSON ID")
+    
 
     class Meta:
         db_table     = "regions"
@@ -35,7 +35,7 @@ class District(models.Model):
         related_name="districts", verbose_name="Viloyat"
     )
     name          = models.CharField(max_length=200, verbose_name="Nomi")
-    json_id       = models.IntegerField(null=True, blank=True, verbose_name="JSON ID")
+    
 
     # Geopy bilan olingan koordinatalar
     latitude      = models.FloatField(null=True, blank=True, verbose_name="Kenglik")

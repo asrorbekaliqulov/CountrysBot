@@ -44,5 +44,27 @@ def create_referral(referrer, referred_user, referral_price=0.0):
     return referral
 
 
+import requests
+from django.conf import settings
+import os
 
+def send_telegram_notification(chat_id, text):
+    """
+    Foydalanuvchiga Telegram bot orqali bildirishnoma yuborish funksiyasi
+    """
+    # Bot tokeningizni settings.py dan oladi, agar u yerda bo'lmasa quyiga to'g'ridan-to'g'ri yozishingiz ham mumkin
+    token = os.getenv("BOT_TOKEN")  # .env faylidan yoki settings.py dan olingan token
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML"
+    }
+    try:
+        response = requests.post(url, json=payload, timeout=5)
+        return response.ok
+    except Exception as e:
+        print(f"Telegramga xabar yuborishda xatolik: {e}")
+        return False
 

@@ -236,7 +236,7 @@
 
                     <div style="background:#f8faff;border:1.5px solid #e0e4f7;border-radius:16px;padding:14px 16px;">
                         <label style="font-size:13px;font-weight:600;color:#4b5563;display:block;margin-bottom:8px;">
-                            💬 Yana nimalar bezovta qilayapti? <span style="font-weight:400;color:#9ca3af;">(ixtiyoriy)</span>
+                            💬 Yana nimalar bezovta qilayadi? <span style="font-weight:400;color:#9ca3af;">(ixtiyoriy)</span>
                         </label>
                         <textarea id="extraComplaint" rows="3"
                             style="width:100%;border:1px solid #d1d5e0;border-radius:10px;padding:10px 12px;font-size:14px;resize:none;outline:none;color:#1f2433;background:#fff;"
@@ -302,7 +302,6 @@
         </footer>
     </div>
 
-    <!-- ── Tuman tavsiya popup ── -->
     <div id="districtModal">
         <div class="modal-backdrop" onclick="closeDistrictModal()"></div>
         <div class="modal-sheet">
@@ -318,21 +317,17 @@
         let districtsData = [];
         let map, marker;
         let currentLang = "{{ request.LANGUAGE_CODE|default:'uz' }}".toLowerCase().split('-')[0];
-        // Django til kodini aniqlash (JS ichida ishlatish uchun)
+        
         if (window.Telegram && window.Telegram.WebApp) {
             const tg = window.Telegram.WebApp;
             tg.expand();
-            
-            // Agar Telegram foydalanuvchisi aniqlansa va uning tili bo'lsa
             if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) {
                 let tgLang = tg.initDataUnsafe.user.language_code.toLowerCase().split('-')[0];
                 if (['uz', 'ru', 'en'].includes(tgLang)) {
-                    currentLang = tgLang; // Telegram tili ustunlikka ega bo'ladi
+                    currentLang = tgLang;
                 }
             }
         }
-
-        console.log("WebApp ishlayotgan joriy til:", currentLang);
 
         let orderState = {
             tg_id: "12345678",
@@ -371,15 +366,10 @@
         });
 
         function fetchServices() {
-            // Siz aytganingizdek to'g'ridan-to'g'ri backend API ga so'rov yuboramiz
             fetch("/api/services/")
                 .then(r => r.json())
                 .then(data => {
-                    console.log("Bazadan kelgan xizmatlar:", data);
-
-                    // Ma'lumot array ekanligini aniq tekshirib olamiz
                     servicesData = Array.isArray(data) ? data : (data.services || data.results || []);
-                    
                     if (!servicesData || servicesData.length === 0) {
                         document.getElementById("servicesList").innerHTML = 
                             '<div class="alert alert-warn">⚠️ Bazada xizmatlar topilmadi.</div>';
@@ -387,15 +377,8 @@
                     }
 
                     let html = '';
-                    
                     servicesData.forEach(s => {
-                        // XAVFSIZ TIL TANLASH:
-                        // Birinchi navbatda 'name_uz' borligini tekshiradi, agar u yo'q bo'lsa 'name' ni oladi.
-                        // Shunda currentLang xato bo'lsa ham frontend umuman buzilmaydi va ma'lumot chiqadi!
                         const localizedName = s.name_uz || s.name || s.name_ru || s.name_en || "Nomsiz xizmat";
-                        
-                        // XAVFSIZ NARX FORMATLASH:
-                        // Narx satr (string) bo'lsa ham, son bo'lsa ham xavfsiz o'giriydi, xato bermaydi
                         let priceValue = "0";
                         if (s.price) {
                             const parsedPrice = parseFloat(s.price);
@@ -404,7 +387,6 @@
                             }
                         }
 
-                        // HTML obyektini shakllantirish
                         html += `
                             <div onclick="selectService(${s.id})" id="srv_${s.id}" class="tile flex items-center justify-between p-4 mb-2 card cursor-pointer">
                                 <div class="flex items-center gap-3">
@@ -417,13 +399,9 @@
                                 <span class="text-xl" style="color:var(--muted)">›</span>
                             </div>`;
                     });
-
-                    // Mana shu qator oxirida HTML ni ekranga chiqaradi:
                     document.getElementById("servicesList").innerHTML = html;
-                    console.log("HTML muvaffaqiyatli render qilindi!");
                 })
                 .catch((err) => { 
-                    console.error("Fetch ichida JS xatoligi yuz berdi:", err);
                     document.getElementById("servicesList").innerHTML = 
                         '<div class="alert alert-err">❌ Frontendda ma\'lumotni chiqarishda xatolik yuz berdi.</div>'; 
                 });
@@ -432,14 +410,6 @@
         function fetchDistricts() {
             fetch("/api/districts/").then(r=>r.json()).then(data => {
                 districtsData = data;
-                // DEBUG: API dan kelgan tumanlar va ularning holati
-                console.table(data.map(d => ({
-                    id: d.id,
-                    name: d.name,
-                    is_active: d.is_active,
-                    delivery_price: d.delivery_price,
-                    served: isDistrictServed(d)
-                })));
                 let html = '<option value="">— {% translate "Tuman tanlang" %} —</option>';
                 data.forEach(d => { html += `<option value="${d.id}">${d.name}</option>`; });
                 document.getElementById("districtSelect").innerHTML = html;
@@ -475,16 +445,13 @@
 
         function isDistrictServed(d){
             if (!d) return false;
-            // is_active: boolean false, string "false", 0, "0", null, undefined — barchasi "ishlamaydi"
             const active = d.is_active;
             if (active == null) return false;
             if (active === false || active === 'false' || active === 0 || active === '0') return false;
-            // delivery_price: mavjud va musbat son bo'lishi shart
             const price = d.delivery_price;
             if (price == null || price === '') return false;
             const priceNum = Number(price);
             if (isNaN(priceNum) || priceNum < 0) return false;
-            // price == 0 ham xizmat ko'rsatishi mumkin (bepul yetkazish), shu sabab >= 0 qoldirdik
             return true;
         }
 
@@ -494,7 +461,13 @@
                 return;
             }
             document.getElementById('locSpinner').classList.remove('hidden');
-            navigator.geolocation.getCurrentPosition(onLocOk, onLocErr, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+            
+            // Timeoutni 25 soniyaga uzaytirdik (Mobil qurilmalarda sekin qidirganda xato bermasligi uchun)
+            navigator.geolocation.getCurrentPosition(onLocOk, onLocErr, {
+                enableHighAccuracy: true, 
+                timeout: 25000, 
+                maximumAge: 0
+            });
         }
 
         async function onLocOk(pos){
@@ -504,11 +477,10 @@
             if (map){ map.setView([lat,lng],14); marker.setLatLng([lat,lng]); }
 
             if (!districtsData.length){
-                setLocResult('<div class="alert alert-warn">Tumanlar ro\'yxati yuklanmadi, qo\'lda tanlang.</div>');
+                setLocResult('<div class="alert alert-warn">⚠️ Tumanlar ro\'yxati yuklanmadi, qo\'lda tanlang.</div>');
                 return;
             }
 
-            // 1. Nominatim orqali faqat ko'rsatish uchun aniq manzil tekstini olamiz
             let humanAddress = null;
             try {
                 const geo = await fetch(
@@ -526,9 +498,8 @@
                     ].filter(Boolean);
                     humanAddress = parts.join(', ') || geoData.display_name?.split(',').slice(0,3).join(', ').trim();
                 }
-            } catch(e) { /* geocoding ishlamasa ham davom etamiz */ }
+            } catch(e) {}
 
-            // 2. Barcha tumanlar uchun masofani hisoblaymiz — faqat DB koordinatalari asosida
             let rankedDistricts = [];
             districtsData.forEach(d => {
                 if (d.latitude == null || d.longitude == null) return;
@@ -536,22 +507,36 @@
                 rankedDistricts.push({ d, dist });
             });
             rankedDistricts.sort((a, b) => a.dist - b.dist);
-            console.log('📍 Foydalanuvchi:', lat, lng);
-            console.log('📊 Tumanlar masofa bo\'yicha:', rankedDistricts.map(r => `${r.d.name}: ${r.dist.toFixed(2)}km (active:${r.d.is_active}, price:${r.d.delivery_price})`));
 
-            // 3. Eng yaqin tuman — koordinatalar asosida (ishonchli usul)
             const detectedEntry = rankedDistricts[0];
 
             if (!detectedEntry) {
-                setLocResult('<div class="alert alert-err">Tuman aniqlanmadi, qo\'lda tanlang.</div>');
+                setLocResult('<div class="alert alert-err">⚠️ Tuman aniqlanmadi, qo\'lda tanlang.</div>');
                 return;
             }
 
             const best = detectedEntry.d;
             const bestDist = detectedEntry.dist;
 
+            // STRATEGIK TUZATISH: Sirdaryo yoki boshqa viloyatliklarni ushlash (Maksimal radius: 35 km)
+            if (bestDist > 35) {
+                document.getElementById('districtSelect').value = '';
+                orderState.district = null;
+                setLocResult(`
+                  <div style="border-radius:16px;overflow:hidden;border:1px solid #fecaca;">
+                    <div style="background:#fef2f2;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;">
+                      <span style="font-size:22px;line-height:1">📍</span>
+                      <div>
+                        <div style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Sizning joylashuvingiz</div>
+                        <div style="font-size:14px;font-weight:700;color:#991b1b">${humanAddress || "Noma'lum hudud"}</div>
+                        <div style="font-size:12px;color:#dc2626;margin-top:4px; font-weight: 600;">❌ Xizmat ko'rsatish hududidan tashqaridasiz. Hozircha faqat Toshkent shahrida xizmat ko'rsatamiz!</div>
+                      </div>
+                    </div>
+                  </div>`);
+                return;
+            }
+
             if (isDistrictServed(best)) {
-                // ✅ Aniqlangan tuman xizmat ko'rsatadi
                 document.getElementById('districtSelect').value = best.id;
                 orderState.district = String(best.id);
                 setLocResult(`
@@ -566,11 +551,9 @@
                     </div>
                   </div>`);
             } else {
-                // ❌ Aniqlangan tuman xizmat ko'rsatmaydi
                 document.getElementById('districtSelect').value = '';
                 orderState.district = null;
 
-                // Eng yaqin ishlayotgan tuman
                 const nearestServed = rankedDistricts.find(({ d }) => isDistrictServed(d) && d.id !== best.id);
 
                 let recommendHtml = '';
@@ -639,27 +622,27 @@
         function onLocErr(err){
             document.getElementById('locSpinner').classList.add('hidden');
             let html = '';
-            if (err.code === 1) {
+            
+            // XATOLIK MULTI-SNAYPER INTEGRATSIYASI: Ruxsat berilmagan yoki GPS o'chirilgan holatlar
+            if (err.code === 1 || err.code === 2 || err.code === 3) {
                 html = `<div style="border-radius:16px;border:1.5px solid #fed7aa;background:#fff7ed;padding:16px;display:flex;gap:12px;align-items:flex-start;">
                     <span style="font-size:24px">📵</span>
                     <div>
-                      <div style="font-weight:700;color:#9a3412;font-size:14px;margin-bottom:6px">Joylashuvga ruxsat berilmagan</div>
-                      <div style="font-size:13px;color:#c2410c;margin-bottom:10px">Joylashuvni yoqing va qayta urinib ko'ring:</div>
+                      <div style="font-weight:700;color:#9a3412;font-size:14px;margin-bottom:6px">Joylashuv aniqlanmadi / Ruxsat berilmagan</div>
+                      <div style="font-size:13px;color:#c2410c;margin-bottom:10px">Telefoningizda GPS (Joylashuv) yoqilganligini tekshiring va brauzerga ruxsat bering:</div>
                       <div style="font-size:12px;color:#92400e;line-height:1.6">
-                        📱 <b>Android:</b> Sozlamalar → Ilovalar → Brauzer → Ruxsatlar → Joylashuv → Ruxsat<br>
-                        🍎 <b>iPhone:</b> Sozlamalar → Maxfiylik → Joylashuv xizmatlari → Brauzer → Ruxsat
+                        📱 <b>Android:</b> Sozlamalar → Joylashuv (GPS) ni yoqing. Keyin Sozlamalar → Ilovalar → Telegram (yoki Brauzer) → Ruxsatlar → Joylashuv → Ruxsat berish.<br>
+                        🍎 <b>iPhone:</b> Sozlamalar → Maxfiylik → Joylashuv xizmatlarini yoqing. Telegram ilovasiga "Ishlatganda" ruxsatini bering.
                       </div>
-                      <button onclick="requestLocation()" style="margin-top:12px;background:#f97316;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;width:100%;">
+                      <button type="button" onclick="requestLocation()" style="margin-top:12px;background:#f97316;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;width:100%;">
                         🔄 Qayta urinib ko'rish
                       </button>
                     </div>
                 </div>`;
             } else {
-                const msg = err.code===2 ? "Joylashuv aniqlanmadi, qayta urinib ko'ring" : "Vaqt tugadi, qayta bosing";
-                html = `<div class="alert alert-err">⚠️ ${msg}</div>`;
+                html = `<div class="alert alert-err">⚠️ Joylashuvni olishda xatolik yuz berdi. Iltimos, tumanni qo'lda tanlang.</div>`;
             }
             setLocResult(html);
-            document.getElementById('locResult').classList.remove('hidden');
         }
 
         function updateUI(){
@@ -724,7 +707,6 @@
                 orderState.address_note = document.getElementById("addressNote").value.trim();
                 const dst = districtsData.find(d=>d.id==orderState.district);
 
-                // Telefon raqam tekshiruvi
                 const phoneRaw = document.getElementById("phoneInput").value.replace(/\D/g,'');
                 const phoneErr = document.getElementById("phoneError");
                 if (phoneRaw.length !== 9) {
@@ -734,7 +716,7 @@
                 }
                 phoneErr.style.display = 'none';
                 orderState.phone = '+998' + phoneRaw;
-                // address_note ga telefon raqamni ham qo'shamiz (backend notes uchun)
+                
                 orderState.address_note = orderState.address_note
                     ? orderState.address_note + ' | Tel: +998' + phoneRaw
                     : 'Tel: +998' + phoneRaw;
@@ -769,25 +751,18 @@
         }
 
         function formatPhone(input) {
-            // Faqat raqamlarni qoldiramiz
             let raw = input.value.replace(/\D/g, '');
-            // 9 raqamdan oshmasin
             if (raw.length > 9) raw = raw.slice(0, 9);
-            // XX XXX XX XX formati
             let formatted = '';
             if (raw.length > 0) formatted = raw.slice(0, 2);
             if (raw.length > 2) formatted += ' ' + raw.slice(2, 5);
             if (raw.length > 5) formatted += ' ' + raw.slice(5, 7);
             if (raw.length > 7) formatted += ' ' + raw.slice(7, 9);
             input.value = formatted;
-            // Xato matni yashirish
             const errEl = document.getElementById('phoneError');
             if (raw.length === 9) errEl.style.display = 'none';
-        
-            orderState.service = id;
-            document.querySelectorAll("[id^='srv_']").forEach(el=>el.classList.remove("selected"));
-            document.getElementById(`srv_${id}`).classList.add("selected");
         }
+        
         function selectPatientType(type){
             orderState.patient_type = type;
             document.getElementById("pTypeAdult").classList.toggle("selected", type==='adult');
@@ -831,15 +806,18 @@
             if (cb.checked) orderState.complaints.push(cb.value);
             else orderState.complaints = orderState.complaints.filter(v=>v!==cb.value);
         }
+        
+        // EMOJILAR INTEGRATSIYASI (Bo'sh va zerikarli bo'lib qolmasligi uchun yuklandi)
         function renderSlots(type){
             let slots = [];
-            if (type==='adult') slots = ['18:00 — 22:00'];
-            else if (orderState.child_timing==='morning') slots = ['07:00 — 10:00'];
-            else if (orderState.child_timing==='day') slots = ['12:00 — 15:00','15:00 — 18:00'];
-            else if (orderState.child_timing==='evening') slots = ['15:00 — 18:00','18:00 — 20:00'];
-            else slots = ['Telefon orqali kelishiladi'];
-            document.getElementById("slotsBox").innerHTML = slots.map(s=>`<div onclick="selectSlot('${s}')" id="slot_${s}" class="tile text-center">${s}</div>`).join('');
+            if (type==='adult') slots = ['🌆 18:00 — 22:00'];
+            else if (orderState.child_timing==='morning') slots = ['🌅 07:00 — 10:00'];
+            else if (orderState.child_timing==='day') slots = ['☀️ 12:00 — 15:00','🌤️ 15:00 — 18:00'];
+            else if (orderState.child_timing==='evening') slots = ['🌤️ 15:00 — 18:00','🌙 18:00 — 20:00'];
+            else slots = ['📞 Telefon orqali kelishiladi'];
+            document.getElementById("slotsBox").innerHTML = slots.map(s=>`<div onclick="selectSlot('${s}')" id="slot_${s}" class="tile text-center font-medium">${s}</div>`).join('');
         }
+        
         function selectSlot(s){
             orderState.pickup_slot = s;
             document.querySelectorAll("[id^='slot_']").forEach(el=>el.classList.remove("selected"));
@@ -928,8 +906,6 @@
             }
 
             try {
-                // Backend /api/orders/ ga yuboramiz
-                // Backend ichida TSPay bilan gaplashadi (CORS muammosi yo'q)
                 btn.textContent = "⏳ Buyurtma yaratilmoqda...";
                 const res = await fetch("/api/orders/", { method: 'POST', body: fd });
                 const data = await res.json();
@@ -941,13 +917,11 @@
                     return;
                 }
 
-                // ── Admin (karta) to'lov ──
                 if (orderState.payment_method === 'admin') {
                     showSuccessScreen("Buyurtmangiz qabul qilindi!<br>Admin chekni tekshirib tasdiqlaydi.");
                     return;
                 }
 
-                // ── TSPay to'lov — backend cheque_id va payment_url ni tayyor holda beradi ──
                 if (data.payment_method === 'tpay') {
                     if (!data.payment_url || !data.cheque_id) {
                         btn.disabled = false;
@@ -955,17 +929,14 @@
                         alert("TSPay havola olinmadi. Keyinroq urinib ko'ring.");
                         return;
                     }
-                    // sessionStorage ga saqlaymiz — redirect qaytganda ishlatamiz
                     sessionStorage.setItem('tspay_cheque_id', data.cheque_id);
                     sessionStorage.setItem('tspay_order_id', String(data.order_id));
 
                     btn.textContent = "💳 TSPay sahifasiga yo'naltirilmoqda...";
-                    // Telegram WebApp ichida location.href ishlamasa replace ishlatamiz
                     window.location.replace(data.payment_url);
                     return;
                 }
 
-                // Boshqa holat
                 btn.disabled = false;
                 btn.textContent = "To'lash →";
 
@@ -989,7 +960,6 @@
             document.querySelector('footer').style.display = 'none';
         }
 
-        // ── TSPay redirect dan qaytganda — backend orqali status tekshirish ──
         async function checkTspayReturn() {
             const chequeId = sessionStorage.getItem('tspay_cheque_id');
             const orderId  = sessionStorage.getItem('tspay_order_id');
@@ -998,7 +968,6 @@
             sessionStorage.removeItem('tspay_cheque_id');
             sessionStorage.removeItem('tspay_order_id');
 
-            // Loading ko'rsatamiz
             document.querySelector('main').innerHTML = `
               <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;padding:24px;text-align:center;">
                 <div style="font-size:48px;margin-bottom:16px;animation:spin 1s linear infinite;">⏳</div>
@@ -1007,7 +976,6 @@
             document.querySelector('footer').style.display = 'none';
 
             try {
-                // Backend /api/orders/{id}/confirm_payment/ → u TSPay dan so'raydi
                 const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
                 const r = await fetch(`/api/orders/${orderId}/confirm_payment/`, {
                     method: 'POST',
@@ -1018,7 +986,6 @@
                     body: JSON.stringify({ cheque_id: chequeId })
                 });
                 const result = await r.json();
-                console.log('confirm_payment result:', result);
 
                 if (result.status === 'paid' || result.status === 'success') {
                     showSuccessScreen("To'lov muvaffaqiyatli!<br>Buyurtmangiz tasdiqlandi. Tez orada siz bilan bog'lanamiz.");
@@ -1028,7 +995,6 @@
                     showFailScreen(result.status || 'failed');
                 }
             } catch(e) {
-                console.error('confirm_payment xato:', e);
                 showFailScreen('connection_error');
             }
         }

@@ -1,0 +1,561 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="{{ request.LANGUAGE_CODE|default:'uz' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{% translate "Shifokor Paneli" %}</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.23s ease-out forwards; }
+        .slide-up { animation: slideUp 0.28s cubic-bezier(0.34, 1.5, 0.64, 1) forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .skel {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: sk 1.4s infinite;
+        }
+        @keyframes sk { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+
+        /* Status badge ranglari */
+        .status-result_pending { background-color: #fef9c3; color: #854d0e; }
+        .status-result_sent    { background-color: #dcfce7; color: #15803d; }
+
+        /* Drag & Drop zona */
+        .drop-zone { transition: all 0.2s ease; }
+        .drop-zone.drag-over {
+            border-color: #10b981;
+            background-color: #ecfdf5;
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans antialiased text-slate-900 select-none">
+
+    <!-- Yuklanish ekrani -->
+    <div id="loadingScreen" class="fixed inset-0 bg-white flex items-center justify-center z-50">
+        <div class="text-center space-y-3">
+            <svg class="animate-spin h-8 w-8 text-emerald-500 mx-auto" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-slate-500 text-sm">{% translate "Yuklanmoqda..." %}</p>
+        </div>
+    </div>
+
+    <!-- Ruxsat yo'q ekrani -->
+    <div id="accessDeniedScreen" class="fixed inset-0 bg-white hidden flex-col items-center justify-center p-8 z-50">
+        <div class="text-6xl mb-4">🚫</div>
+        <h2 class="text-xl font-bold text-slate-800">{% translate "Ruxsat yo'q" %}</h2>
+        <p class="text-slate-500 text-sm mt-1 text-center">Tizimga kirish uchun shifokor yoki admin huquqi talab qilinadi.</p>
+    </div>
+
+    <!-- Asosiy ilova -->
+    <div id="mainApp" class="h-[100dvh] flex flex-col hidden">
+
+        <!-- Header -->
+        <div class="shrink-0 bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-4 pt-10 pb-4 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-xl font-bold">👨‍⚕️ {% translate "Shifokor Paneli" %}</h1>
+                    <p class="text-emerald-100 text-xs mt-0.5">ID: <span id="doctorTgIdDisplay">...</span></p>
+                </div>
+                <button onclick="loadOrders()"
+                    class="w-9 h-9 bg-white/20 hover:bg-white/30 active:scale-95 transition-all rounded-full flex items-center justify-center">
+                    <svg id="refreshIcon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Status filterlari -->
+            <div class="flex gap-2 mt-3 overflow-x-auto pb-1 scrollbar-hide">
+                <button onclick="setFilter('all')" id="filter-all"
+                    class="filter-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-emerald-700 transition-all">
+                    Barchasi
+                </button>
+                <button onclick="setFilter('result_pending')" id="filter-result_pending"
+                    class="filter-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/20 text-white transition-all">
+                    ⏳ Natija kutilmoqda
+                </button>
+                <button onclick="setFilter('result_sent')" id="filter-result_sent"
+                    class="filter-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/20 text-white transition-all">
+                    ✅ Natija yuborildi
+                </button>
+            </div>
+        </div>
+
+        <!-- Toast xabar -->
+        <div id="successToast"
+            class="shrink-0 bg-green-600 text-white text-center py-3 text-sm font-medium hidden fade-in"></div>
+        <div id="errorToast"
+            class="shrink-0 bg-red-500 text-white text-center py-3 text-sm font-medium hidden fade-in"></div>
+
+        <!-- Buyurtmalar ro'yxati -->
+        <div class="flex-1 overflow-y-auto p-4 space-y-3" id="ordersContainer"></div>
+    </div>
+
+    <!-- Natija yuborish bottom sheet -->
+    <div id="uploadSheet" class="fixed inset-0 z-40 hidden">
+        <div class="absolute inset-0 bg-black/50 transition-opacity" onclick="tryCloseSheet()"></div>
+        <div class="absolute bottom-0 inset-x-0 bg-white rounded-t-3xl p-6 space-y-4 max-w-md mx-auto slide-up max-h-[90vh] overflow-y-auto">
+
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-lg">{% translate "Natija yuborish" %}</h3>
+                <button onclick="tryCloseSheet()"
+                    class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200">✕</button>
+            </div>
+
+            <!-- Bemor ma'lumotlari -->
+            <div class="bg-slate-50 rounded-xl p-3 text-sm border border-slate-100">
+                <div class="font-semibold text-slate-800" id="modalPatientName"></div>
+                <div class="text-slate-500 text-xs mt-0.5" id="modalOrderMeta"></div>
+                <div class="text-slate-400 text-xs mt-0.5" id="modalService"></div>
+            </div>
+
+            <!-- Fayl yuklash zonasi -->
+            <div class="space-y-2">
+                <p class="text-xs text-slate-500 font-medium">{% translate "PDF, JPG, PNG yoki ZIP fayl tanlang" %} <span class="text-red-400">(max 25 MB)</span></p>
+
+                <!-- Drag & Drop zona -->
+                <div id="dropZone"
+                    class="drop-zone w-full rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 transition-colors cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30"
+                    onclick="document.getElementById('fileInput').click()"
+                    ondragover="onDragOver(event)"
+                    ondragleave="onDragLeave(event)"
+                    ondrop="onDrop(event)">
+
+                    <div id="dropZoneEmpty" class="flex flex-col items-center justify-center py-7 gap-2">
+                        <div class="text-3xl">📂</div>
+                        <p class="text-sm text-slate-500 font-medium">Fayl tanlang yoki bu yerga tashlang</p>
+                        <p class="text-xs text-slate-400">PDF · JPG · PNG · ZIP</p>
+                    </div>
+
+                    <div id="dropZoneSelected" class="hidden flex items-center gap-3 px-4 py-4">
+                        <div id="fileIconEmoji" class="text-2xl shrink-0">📄</div>
+                        <div class="min-w-0 flex-1">
+                            <p id="selectedFileName" class="text-sm font-semibold text-slate-800 truncate"></p>
+                            <p id="selectedFileSize" class="text-xs text-slate-400 mt-0.5"></p>
+                        </div>
+                        <button onclick="clearFile(event)"
+                            class="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-slate-200 hover:bg-red-100 hover:text-red-500 text-slate-500 text-xs transition-colors">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+
+                <input type="file" id="fileInput" class="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png,.zip"
+                    onchange="onFileSelected(this)">
+            </div>
+
+            <!-- Upload progress -->
+            <div id="progressContainer" class="hidden space-y-1.5">
+                <div class="flex justify-between text-xs text-slate-500">
+                    <span>Yuklanmoqda...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2">
+                    <div id="progressBar" class="progress-bar bg-emerald-500 h-2 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Xato xabari -->
+            <p id="errorMsg" class="text-red-500 text-sm text-center hidden"></p>
+
+            <!-- Tugmalar -->
+            <div class="grid grid-cols-2 gap-3 pt-1">
+                <button onclick="tryCloseSheet()" id="cancelBtn"
+                    class="h-12 border border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors">
+                    {% translate "Bekor qilish" %}
+                </button>
+                <button onclick="sendResult()" id="submitBtn" disabled
+                    class="h-12 bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-medium rounded-xl hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5 shadow-sm">
+                    📤 {% translate "Yuborish" %}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ─── Tarjimalar ─────────────────────────────────────────────────────────────
+        const t = {
+            noOrders:       "{% translate 'Hozircha buyurtma yo\'q' %}",
+            sendResult:     "{% translate 'Natija yuborish' %}",
+            uploading:      "{% translate 'Yuborilmoqda...' %}",
+            success:        "{% translate 'Natija muvaffaqiyatli yuborildi! ✅' %}",
+            result_pending: "{% translate 'Natija kutilmoqda' %}",
+            result_sent:    "{% translate 'Natija yuborildi' %}",
+            ageStr:         "{% translate 'yosh' %}",
+        };
+
+        // ─── O'zgaruvchilar ──────────────────────────────────────────────────────────
+        let tgId         = "12345678";
+        let fetchedOrders = [];
+        let activeOrderIndex = null;
+        let selectedFile  = null;
+        let currentFilter = 'all';
+        let isUploading   = false;
+
+        // ─── Telegram WebApp init ────────────────────────────────────────────────────
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.expand();
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                tgId = tg.initDataUnsafe.user.id.toString();
+            }
+        }
+        document.getElementById('doctorTgIdDisplay').innerText = tgId;
+
+        // ─── DOMContentLoaded ────────────────────────────────────────────────────────
+        document.addEventListener("DOMContentLoaded", () => checkAuthorization());
+
+        // ─── Avtorizatsiya ───────────────────────────────────────────────────────────
+        function checkAuthorization() {
+            fetch(`/api/staff/me?tg_id=${tgId}`)
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('loadingScreen').classList.add('hidden');
+                    if (['doctor', 'admin'].includes(data.role)) {
+                        document.getElementById('mainApp').classList.remove('hidden');
+                        loadOrders();
+                    } else {
+                        document.getElementById('accessDeniedScreen').classList.remove('hidden');
+                        document.getElementById('accessDeniedScreen').classList.add('flex');
+                    }
+                })
+                .catch(() => {
+                    // Xato bo'lsa ham panelni ko'rsatamiz (test uchun)
+                    document.getElementById('loadingScreen').classList.add('hidden');
+                    document.getElementById('mainApp').classList.remove('hidden');
+                    loadOrders();
+                });
+        }
+
+        // ─── Filter ──────────────────────────────────────────────────────────────────
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'text-emerald-700');
+                btn.classList.add('bg-white/20', 'text-white');
+            });
+            const active = document.getElementById(`filter-${filter}`);
+            if (active) {
+                active.classList.add('bg-white', 'text-emerald-700');
+                active.classList.remove('bg-white/20', 'text-white');
+            }
+            renderOrders();
+        }
+
+        // ─── Buyurtmalarni yuklash ───────────────────────────────────────────────────
+        function loadOrders() {
+            const container   = document.getElementById('ordersContainer');
+            const refreshIcon = document.getElementById('refreshIcon');
+
+            refreshIcon.classList.add('animate-spin');
+            container.innerHTML = Array.from({ length: 3 }).map(() => `
+                <div class="h-36 bg-white rounded-xl p-4 space-y-3 shadow-sm border border-slate-100">
+                    <div class="flex justify-between">
+                        <div class="skel w-24 h-4 rounded"></div>
+                        <div class="skel w-20 h-4 rounded"></div>
+                    </div>
+                    <div class="skel w-3/4 h-5 rounded"></div>
+                    <div class="skel w-1/2 h-4 rounded"></div>
+                    <div class="skel w-full h-9 rounded-lg"></div>
+                </div>
+            `).join('');
+
+            fetch(`/api/doctor/orders?tg_id=${tgId}`)
+                .then(r => r.json())
+                .then(orders => {
+                    refreshIcon.classList.remove('animate-spin');
+                    fetchedOrders = orders || [];
+                    renderOrders();
+                })
+                .catch(() => {
+                    refreshIcon.classList.remove('animate-spin');
+                    container.innerHTML = `
+                        <div class="flex flex-col items-center justify-center py-20 text-slate-400">
+                            <div class="text-5xl mb-3">⚠️</div>
+                            <p class="text-sm">Ma'lumot yuklashda xatolik yuz berdi.</p>
+                            <button onclick="loadOrders()" class="mt-3 text-emerald-600 text-sm font-medium">Qayta urinish</button>
+                        </div>`;
+                });
+        }
+
+        // ─── Buyurtmalarni render qilish ─────────────────────────────────────────────
+        function renderOrders() {
+            const container = document.getElementById('ordersContainer');
+
+            let orders = fetchedOrders;
+            if (currentFilter !== 'all') {
+                orders = fetchedOrders.filter(o => o.status === currentFilter);
+            }
+
+            if (orders.length === 0) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-20 text-slate-400">
+                        <div class="text-5xl mb-3">📭</div>
+                        <p class="text-sm">${t.noOrders}</p>
+                    </div>`;
+                return;
+            }
+
+            let html = '';
+            orders.forEach((order, i) => {
+                // fetchedOrders ichidagi haqiqiy indeksni topamiz
+                const realIndex = fetchedOrders.indexOf(order);
+                const displayId  = order.order_id || order.orderId;
+                const statusText = t[order.status] || order.status;
+                const dateStr    = new Date(order.createdAt).toLocaleDateString('uz-UZ');
+                const timeStr    = new Date(order.createdAt).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+                const icon       = order.patientType === 'child' ? '👶' : '🧑';
+                const serviceStr = order.serviceName ? `🧪 ${order.serviceName}` : '';
+
+                let actionButton = '';
+                if (order.status === 'result_pending') {
+                    // Natija yuborish tugmasi
+                    actionButton = `
+                        <button onclick="openUploadSheet(${realIndex})"
+                            class="w-full h-10 bg-emerald-600 text-white font-medium text-sm rounded-lg hover:bg-emerald-700 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 shadow-sm">
+                            📤 ${t.sendResult}
+                        </button>`;
+                } else if (order.status === 'result_sent') {
+                    // Yakunlangan
+                    actionButton = `
+                        <div class="flex items-center gap-1.5 text-xs text-green-600 font-semibold py-1">
+                            ✅ Natija yuborilgan — yakunlangan
+                        </div>`;
+                }
+
+                html += `
+                    <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-2.5 fade-in">
+                        <div class="flex items-center justify-between">
+                            <span class="font-mono text-sm font-bold text-emerald-700">#${displayId}</span>
+                            <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full status-${order.status}">
+                                ${statusText}
+                            </span>
+                        </div>
+                        <div class="text-sm text-slate-800">
+                            <span class="font-bold">${order.patientName}</span>
+                            <span class="text-slate-500 ml-1">${order.patientAge} ${t.ageStr} · ${icon}</span>
+                        </div>
+                        ${serviceStr ? `<div class="text-xs text-slate-400">${serviceStr}</div>` : ''}
+                        <div class="text-[11px] text-slate-400">${dateStr} · ${timeStr}</div>
+                        ${actionButton}
+                    </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        // ─── Upload sheet ochish/yopish ──────────────────────────────────────────────
+        function openUploadSheet(index) {
+            activeOrderIndex = index;
+            const order = fetchedOrders[index];
+            selectedFile = null;
+
+            document.getElementById('modalPatientName').innerText = order.patientName;
+            document.getElementById('modalOrderMeta').innerText =
+                `#${order.order_id || order.orderId} · ${order.patientAge} ${t.ageStr}`;
+            document.getElementById('modalService').innerText =
+                order.serviceName ? `🧪 ${order.serviceName}` : '';
+
+            resetFileUI();
+            document.getElementById('uploadSheet').classList.remove('hidden');
+        }
+
+        function tryCloseSheet() {
+            if (isUploading) return;
+            closeUploadSheet();
+        }
+
+        function closeUploadSheet() {
+            document.getElementById('uploadSheet').classList.add('hidden');
+            resetFileUI();
+            activeOrderIndex = null;
+            selectedFile = null;
+        }
+
+        function resetFileUI() {
+            document.getElementById('fileInput').value = '';
+            document.getElementById('dropZoneEmpty').classList.remove('hidden');
+            document.getElementById('dropZoneSelected').classList.add('hidden');
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('errorMsg').classList.add('hidden');
+            document.getElementById('progressContainer').classList.add('hidden');
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressPercent').innerText = '0%';
+            document.getElementById('submitBtn').innerHTML = `📤 {% translate "Yuborish" %}`;
+            document.getElementById('cancelBtn').disabled = false;
+        }
+
+        // ─── Drag & Drop ─────────────────────────────────────────────────────────────
+        function onDragOver(e) {
+            e.preventDefault();
+            document.getElementById('dropZone').classList.add('drag-over');
+        }
+        function onDragLeave(e) {
+            document.getElementById('dropZone').classList.remove('drag-over');
+        }
+        function onDrop(e) {
+            e.preventDefault();
+            document.getElementById('dropZone').classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files && files[0]) processFile(files[0]);
+        }
+
+        // ─── Fayl tanlash ────────────────────────────────────────────────────────────
+        function onFileSelected(input) {
+            if (input.files && input.files[0]) processFile(input.files[0]);
+        }
+
+        function processFile(file) {
+            const MAX_SIZE = 25 * 1024 * 1024; // 25 MB
+            const allowed  = ['application/pdf', 'image/jpeg', 'image/png', 'application/zip',
+                               'application/x-zip-compressed', 'application/octet-stream'];
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            const allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'zip'];
+
+            // Hajm tekshiruvi
+            if (file.size > MAX_SIZE) {
+                showError("Fayl hajmi 25 MB dan oshmasligi kerak!");
+                return;
+            }
+
+            // Kengaytma tekshiruvi
+            if (!allowedExts.includes(ext)) {
+                showError("Faqat PDF, JPG, PNG yoki ZIP fayl qabul qilinadi!");
+                return;
+            }
+
+            selectedFile = file;
+            document.getElementById('errorMsg').classList.add('hidden');
+
+            // Fayl ikonkasi
+            const icons = { pdf: '📄', jpg: '🖼️', jpeg: '🖼️', png: '🖼️', zip: '🗜️' };
+            document.getElementById('fileIconEmoji').innerText = icons[ext] || '📎';
+            document.getElementById('selectedFileName').innerText = file.name;
+            document.getElementById('selectedFileSize').innerText = formatFileSize(file.size);
+
+            document.getElementById('dropZoneEmpty').classList.add('hidden');
+            document.getElementById('dropZoneSelected').classList.remove('hidden');
+            document.getElementById('submitBtn').disabled = false;
+        }
+
+        function clearFile(e) {
+            e.stopPropagation();
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('dropZoneEmpty').classList.remove('hidden');
+            document.getElementById('dropZoneSelected').classList.add('hidden');
+            document.getElementById('submitBtn').disabled = true;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // ─── Natija yuborish ─────────────────────────────────────────────────────────
+        function sendResult() {
+            if (!selectedFile || activeOrderIndex === null || isUploading) return;
+
+            const order    = fetchedOrders[activeOrderIndex];
+            const orderId  = order.order_id || order.orderId;
+            const submitBtn = document.getElementById('submitBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+
+            isUploading = true;
+            submitBtn.disabled = true;
+            cancelBtn.disabled = true;
+            submitBtn.innerHTML = `⏳ ${t.uploading}`;
+            document.getElementById('errorMsg').classList.add('hidden');
+            document.getElementById('progressContainer').classList.remove('hidden');
+
+            // XHR bilan progress kuzatamiz
+            const reader = new FileReader();
+            reader.readAsDataURL(selectedFile);
+            reader.onload = function () {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', `/api/doctor/orders/${orderId}/result?tg_id=${tgId}`, true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+
+                // Upload progress
+                xhr.upload.onprogress = function (e) {
+                    if (e.lengthComputable) {
+                        const pct = Math.round((e.loaded / e.total) * 100);
+                        document.getElementById('progressBar').style.width = pct + '%';
+                        document.getElementById('progressPercent').innerText = pct + '%';
+                    }
+                };
+
+                xhr.onload = function () {
+                    isUploading = false;
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        closeUploadSheet();
+                        showToast(t.success);
+                        loadOrders();
+                    } else {
+                        let errMsg = `Server xatosi: ${xhr.status}`;
+                        try {
+                            const errData = JSON.parse(xhr.responseText);
+                            errMsg = errData.error || errMsg;
+                        } catch (_) {}
+                        showError(errMsg);
+                        submitBtn.disabled = false;
+                        cancelBtn.disabled = false;
+                        submitBtn.innerHTML = `📤 {% translate "Yuborish" %}`;
+                    }
+                };
+
+                xhr.onerror = function () {
+                    isUploading = false;
+                    showError("Tarmoq xatosi. Internet aloqasini tekshiring.");
+                    submitBtn.disabled = false;
+                    cancelBtn.disabled = false;
+                    submitBtn.innerHTML = `📤 {% translate "Yuborish" %}`;
+                };
+
+                xhr.send(JSON.stringify({
+                    file_base64: reader.result,
+                    filename: selectedFile.name,
+                    file_size: selectedFile.size
+                }));
+            };
+
+            reader.onerror = function () {
+                isUploading = false;
+                showError("Faylni o'qishda xatolik yuz berdi.");
+                submitBtn.disabled = false;
+                cancelBtn.disabled = false;
+                submitBtn.innerHTML = `📤 {% translate "Yuborish" %}`;
+            };
+        }
+
+        // ─── Toast xabarlar ──────────────────────────────────────────────────────────
+        function showToast(msg) {
+            const toast = document.getElementById('successToast');
+            toast.innerHTML = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3500);
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('errorMsg');
+            el.innerText = msg;
+            el.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
