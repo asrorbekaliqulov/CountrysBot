@@ -26,5 +26,6 @@ DEFAULT_APPS = [
 
 PROJECT_APPS = [
     "apps.shared.apps.SharedConfig",
-    "apps.Bot",
+    "apps.Bot.apps.BotConfig",
+    "apps.tspay.apps.TspayConfig",
 ]

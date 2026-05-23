@@ -236,7 +236,7 @@
 
                     <div style="background:#f8faff;border:1.5px solid #e0e4f7;border-radius:16px;padding:14px 16px;">
                         <label style="font-size:13px;font-weight:600;color:#4b5563;display:block;margin-bottom:8px;">
-                            💬 Yana nimalar bezovta qilayadi? <span style="font-weight:400;color:#9ca3af;">(ixtiyoriy)</span>
+                            💬 Yana nimalar bezovta qiladi? <span style="font-weight:400;color:#9ca3af;">(ixtiyoriy)</span>
                         </label>
                         <textarea id="extraComplaint" rows="3"
                             style="width:100%;border:1px solid #d1d5e0;border-radius:10px;padding:10px 12px;font-size:14px;resize:none;outline:none;color:#1f2433;background:#fff;"
@@ -248,12 +248,12 @@
                         <div class="grid grid-cols-2 gap-3">
                             <div onclick="selectPayMethod('tpay')" id="methodTpay" class="tile text-center py-4">
                                 <span style="font-size:22px">💳</span>
-                                <span class="block text-sm font-semibold mt-1" style="color:var(--brand-ink)">TPAY</span>
+                                <span class="block text-sm font-semibold mt-1" style="color:var(--brand-ink)">Karta orqali</span>
                                 <span class="text-xs" style="color:var(--muted)">Onlayn to'lov</span>
                             </div>
                             <div onclick="selectPayMethod('admin')" id="methodAdmin" class="tile text-center py-4">
                                 <span style="font-size:22px">🏦</span>
-                                <span class="block text-sm font-semibold mt-1" style="color:#b45309">Karta orqali</span>
+                                <span class="block text-sm font-semibold mt-1" style="color:#b45309">Admin orqali</span>
                                 <span class="text-xs" style="color:var(--muted)">Chek yuborish</span>
                             </div>
                         </div>
@@ -907,7 +907,7 @@
 
             try {
                 btn.textContent = "⏳ Buyurtma yaratilmoqda...";
-                const res = await fetch("/api/orders/", { method: 'POST', body: fd });
+                const res = await fetch("/tspay/orders/", { method: 'POST', body: fd });
                 const data = await res.json();
 
                 if (!data.success) {
@@ -977,7 +977,7 @@
 
             try {
                 const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-                const r = await fetch(`/api/orders/${orderId}/confirm_payment/`, {
+                const r = await fetch(`/tspay/orders/${orderId}/confirm_payment/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

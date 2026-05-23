@@ -392,16 +392,7 @@
         </select>
       </div>
 
-      <!-- ══ NATIJA YUKASH ══ -->
-      <div class="modal-section">
-        <div class="modal-section-title">🧫 Natija va Shifokor Xulosasi</div>
-        <textarea class="textarea mb-2" id="m-conclusion" placeholder="Xulosani yozing..." rows="2"
-          style="width:100%;border-radius:8px;padding:8px;border:1px solid var(--border);resize:vertical"></textarea>
-        <input type="file" id="m-file" accept="image/*,application/pdf" class="input" />
-        <div id="m-has-result-badge" style="display:none;color:var(--green);font-size:12px;font-weight:700;margin-top:6px">
-          ✅ Natija fayli avval yuklangan.
-        </div>
-      </div>
+      
 
       <!-- Tugmalar -->
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
@@ -674,7 +665,7 @@ async function approveAdminPayment() {
   btn.textContent = '⏳ Tasdiqlanmoqda...';
 
   try {
-    const res = await fetch(`/api/orders/${id}/confirm_payment/?tg_id=${TG_ID}`, {
+    const res = await fetch(`/tspay/order/${id}/confirm_payment/?tg_id=${TG_ID}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_admin: true }),

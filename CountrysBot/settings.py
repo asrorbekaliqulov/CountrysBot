@@ -18,8 +18,8 @@ if DEBUG is not None:
 else:
     DEBUG = False
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "methods-slight-thumbnails-nationally.trycloudflare.com"]
-CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1", "https://localhost:8000", "https://methods-slight-thumbnails-nationally.trycloudflare.com"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "div-balanced-railway-supporting.trycloudflare.com"]
+CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1", "https://localhost:8000", "https://div-balanced-railway-supporting.trycloudflare.com"]
 
 INSTALLED_APPS = [*THIRD_PARTY_APPS, *DEFAULT_APPS, *PROJECT_APPS]
 
@@ -209,13 +209,13 @@ TELEGRAM_ADMIN_IDS = [
     for x in os.environ.get("TELEGRAM_ADMIN_IDS", "").split(",")
     if x.strip().isdigit()
 ]
-WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://calibration-powers-herbs-hose.trycloudflare.com")
+WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://n-medhomelab.uz")
 
 # ─── TSPAY ────────────────────────────────────────────────────────────────────
-TSPAY_MERCHANT_ID = os.environ.get("TSPAY_MERCHANT_ID", "0f039e001bcd4020")
-TSPAY_SECRET_KEY  = os.environ.get("TSPAY_SECRET_KEY", "7bb7eb8cf4424472e1ef9fe46cc1c66565c8b445202adb01")
+TSPAY_MERCHANT_ID = os.environ.get("TSPAY_MERCHANT_ID")
+TSPAY_SECRET_KEY  = os.environ.get("TSPAY_SECRET_KEY")
 TSPAY_BASE_URL    = "https://api.tspay.uz"
-WEBAPP_BASE_URL   = "https://calibration-powers-herbs-hose.trycloudflare.com"
+TSPAY_WEBHOOK_SECRET = os.environ.get("TSPAY_WEBHOOK_SECRET")
 # ─── CELERY ───────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL       = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND   = os.environ.get("REDIS_URL", "redis://localhost:6379/0")

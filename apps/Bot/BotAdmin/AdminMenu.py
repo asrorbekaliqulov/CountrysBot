@@ -48,18 +48,18 @@ async def admin_menyu(
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🛠 Admin panelni ochish",  web_app=WebAppInfo(url=webapp_url))],
         [InlineKeyboardButton(pending_label,             web_app=WebAppInfo(url=pending_url))],
+        # [
+        #     InlineKeyboardButton("⚙️ Sozlamalar",     callback_data="admin_settings"),
+        #     InlineKeyboardButton("👥 Xodimlar",       callback_data="admin_users"),
+        # ],
         [
-            InlineKeyboardButton("⚙️ Sozlamalar",     callback_data="admin_settings"),
-            InlineKeyboardButton("👥 Xodimlar",       callback_data="admin_users"),
-        ],
-        [
-            InlineKeyboardButton("📊 Statistika",     callback_data="botstats"),
+            InlineKeyboardButton("📊 Bot Statistikasi",     callback_data="botstats"),
             InlineKeyboardButton("📣 Xabar yuborish", callback_data="send_messages"),
         ],
-        [
-            InlineKeyboardButton("📦 Buyurtmalar",    callback_data="admin_orders"),
-            InlineKeyboardButton("📍 Faol tumanlar",  callback_data="admin_districts"),
-        ],
+        # [
+        #     InlineKeyboardButton("📦 Buyurtmalar",    callback_data="admin_orders"),
+        #     InlineKeyboardButton("📍 Faol tumanlar",  callback_data="admin_districts"),
+        # ],
     ])
 
     text = "🛠 <b>Admin boshqaruv paneli</b>"
