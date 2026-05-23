@@ -32,7 +32,7 @@ UNFOLD = {
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": True,
     "SHOW_LANGUAGES": True,
-    "ENVIRONMENT": "core.config.unfold.environment_callback",
+    "ENVIRONMENT": "CountrysBot.config.unfold.environment_callback",
     "DASHBOARD_CALLBACK": "apps.shared.views.dashboard.dashboard_callback",
     "LOGIN": {
         "image": lambda request: static("images/login.png"),
