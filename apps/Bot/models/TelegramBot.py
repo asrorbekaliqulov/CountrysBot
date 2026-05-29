@@ -254,10 +254,8 @@ def auto_assign_courier(order):
         )[0]
         logger.info(f"Hamma kuryer band. Order #{order.id} eng birinchi zakaz olgan kuryerga biriktirildi: {chosen_courier.tg_id}")
 
-    # Buyurtmaga kuryerni bog'laymiz
-    order.courier = chosen_courier
-    order.status = 'paid'  # To'langan va kuryerga tayyor status
-    order.save()
+    order.status = 'paid'
+    order.save(update_fields=['status'])
     
     # 💥 TODO: Bu yerda Telegram bot orqali kuryerga bildirishnoma yuborish kodi yozilishi mumkin
     # send_bot_message(chosen_courier.tg_id, f"Sizga yangi buyurtma biriktirildi: #{order.id}")

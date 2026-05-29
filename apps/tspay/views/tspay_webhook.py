@@ -107,9 +107,8 @@ def _auto_assign_courier(order: Order):
         key=lambda c: (c.active_count, c.first_order_time or datetime.now())
     )[0]
 
-    order.courier = chosen
-    order.status  = 'paid'
-    order.save(update_fields=['status', 'courier'])
+    order.status = 'paid'
+    order.save(update_fields=['status'])
 
     logger.info("[TSPay] Order #%s → Kuryer TG_ID: %s", order.id, chosen.user_id)
 

@@ -18,8 +18,8 @@ if DEBUG is not None:
 else:
     DEBUG = False
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "div-balanced-railway-supporting.trycloudflare.com"]
-CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1", "https://localhost:8000", "https://div-balanced-railway-supporting.trycloudflare.com"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "e855-2a05-45c2-6296-9900-8d20-c23-4618-f5c9.ngrok-free.app"]
+CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1", "https://localhost:8000", "https://e855-2a05-45c2-6296-9900-8d20-c23-4618-f5c9.ngrok-free.app"]
 
 INSTALLED_APPS = [*THIRD_PARTY_APPS, *DEFAULT_APPS, *PROJECT_APPS]
 

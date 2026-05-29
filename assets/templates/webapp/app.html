@@ -1,0 +1,259 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="{{ request.LANGUAGE_CODE|default:'uz' }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NMED HOME LAB</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="{% static 'css/nmed-webapp.css' %}">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <header class="app-header">
+    <button type="button" class="btn-back" id="btnBack" aria-label="Orqaga">←</button>
+    <div class="logo-wrap">
+      <div class="logo-icon">🧪</div>
+      <div>
+        <div class="logo-text">NMED HOME LAB</div>
+        <div class="logo-sub">Uy sharoitida tibbiy tahlil</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- HOME -->
+  <section id="screen-home" class="screen active">
+    <div class="hero">
+      <h1 id="heroTitle">Laboratoriya endi uyingizda</h1>
+      <ul class="hero-list">
+        <li><span class="ic">👨‍⚕️</span><span>Professional mutaxassislar</span></li>
+        <li><span class="ic">🧫</span><span>Steril konteynerlar</span></li>
+        <li><span class="ic">🚚</span><span>Uyingizgacha yetkazib berish</span></li>
+        <li><span class="ic">📊</span><span>Onlayn natija — 1-2 kun</span></li>
+        <li><span class="ic">✅</span><span>99% aniqlik kafolati</span></li>
+      </ul>
+      <button type="button" class="btn-primary" id="btnOrderMain">🧪 Tahlil buyurtma qilish</button>
+    </div>
+
+    <nav class="menu-list">
+      <a class="menu-item" data-goto="results" data-menu="my_results">
+        <span class="mi-icon">📊</span><span class="mi-label">Natijalarim</span><span class="mi-arrow">›</span>
+      </a>
+      <a class="menu-item" data-goto="orders" data-menu="order_status">
+        <span class="mi-icon">🚚</span><span class="mi-label">Buyurtma holati</span><span class="mi-arrow">›</span>
+      </a>
+      <a class="menu-item" data-goto="profile" data-menu="profile">
+        <span class="mi-icon">👤</span><span class="mi-label">Profilim</span><span class="mi-arrow">›</span>
+      </a>
+      <a class="menu-item" data-goto="feedback" data-menu="feedback">
+        <span class="mi-icon">⭐️</span><span class="mi-label">Fikr & taklif</span><span class="mi-arrow">›</span>
+      </a>
+      <a class="menu-item" data-goto="trust" data-menu="trust">
+        <span class="mi-icon">🛡️</span><span class="mi-label">Nega bizga ishonishadi?</span><span class="mi-arrow">›</span>
+      </a>
+      <a class="menu-item" data-goto="support" data-menu="support">
+        <span class="mi-icon">📞</span><span class="mi-label">Qo'llab-quvvatlash</span><span class="mi-arrow">›</span>
+      </a>
+    </nav>
+
+    <div class="included-bar">
+      <h3>Narxga nimalar kiritilgan?</h3>
+      <div class="included-icons">
+        <span>🧫 Konteyner</span>
+        <span>🚚 Yetkazish</span>
+        <span>📖 Qo'llanma</span>
+        <span>🔬 Tahlil</span>
+        <span>👨‍⚕️ Nazorat</span>
+        <span>📱 Onlayn natija</span>
+        <span>🕐 24/7 yordam</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- WIZARD -->
+  <section id="screen-wizard" class="screen">
+    <div class="wizard-body" id="wizardBody">
+      {% csrf_token %}
+      <div class="wizard-progress">
+        <div class="progress-track"><div class="progress-fill" id="wizardProgress" style="width:12%"></div></div>
+        <div class="step-label" id="wizardStepLabel">1 / 8</div>
+      </div>
+
+      <div class="wizard-step active" data-step="1">
+        <h2>Tahlil turini tanlang</h2>
+        <p class="sub">Sizga mos tahlilni belgilang</p>
+        <div id="servicesList"></div>
+        <p class="sub" style="margin-top:12px;text-align:center">⏱ 1-2 kun · ✅ 99% aniqlik</p>
+      </div>
+
+      <div class="wizard-step" data-step="2">
+        <h2>Bemor kim?</h2>
+        <p class="sub">Tahlil kim uchun?</p>
+        <div class="pill-grid">
+          <button type="button" class="pill-btn" id="pTypeAdult" onclick="window.NMED.selectPatientType('adult')">🧑 Katta odam</button>
+          <button type="button" class="pill-btn" id="pTypeChild" onclick="window.NMED.selectPatientType('child')">👶 Bola</button>
+        </div>
+      </div>
+
+      <div class="wizard-step" data-step="3">
+        <h2>Bemor ma'lumoti</h2>
+        <p class="sub">Asosiy ma'lumotlarni kiriting</p>
+        <label class="field-label">F.I.Sh</label>
+        <input type="text" class="input-field" id="patientName" placeholder="Alisher Karimov">
+        <label class="field-label">Yoshi</label>
+        <input type="number" class="input-field" id="patientAge" placeholder="25">
+        <label class="field-label">Jinsi</label>
+        <div class="pill-grid">
+          <button type="button" class="pill-btn" id="genderMale" onclick="window.NMED.selectGender('male')">👨 Erkak</button>
+          <button type="button" class="pill-btn" id="genderFemale" onclick="window.NMED.selectGender('female')">👩 Ayol</button>
+        </div>
+      </div>
+
+      <div class="wizard-step" data-step="4">
+        <h2>Hojat vaqti</h2>
+        <p class="sub">Farzandingiz odatda qachon hojatga boradi?</p>
+        <div class="pill-grid" id="childTimingsGrid"></div>
+        <p class="sub" style="margin-top:16px">Pampers (taglik) taqadimi?</p>
+        <div class="pill-grid">
+          <button type="button" class="pill-btn" id="diaperYes" onclick="window.NMED.selectDiaper(true)">Ha</button>
+          <button type="button" class="pill-btn" id="diaperNo" onclick="window.NMED.selectDiaper(false)">Yo'q</button>
+        </div>
+      </div>
+
+      <div class="wizard-step" data-step="5">
+        <h2>Shikoyatlar</h2>
+        <p class="sub">Belgilarni tanlang (bir nechta)</p>
+        <div id="complaintsBox"></div>
+        <label class="field-label">Qo'shimcha ma'lumot</label>
+        <input type="text" class="input-field" id="customComplaint" placeholder="Boshqa belgilar...">
+      </div>
+
+      <div class="wizard-step" data-step="6">
+        <h2>Yetkazish vaqti</h2>
+        <p class="sub">Operator siz bilan bog'lanib vaqtni kelishadi</p>
+        <div id="slotsBox"></div>
+      </div>
+
+      <div class="wizard-step" data-step="7">
+        <h2>Yetkazish manzili</h2>
+        <p class="sub">Joylashuvni yuboring yoki tumanni tanlang</p>
+        <button type="button" class="btn-primary" id="btnLoc" style="margin-bottom:12px">📍 Joylashuvni yuborish</button>
+        <label class="field-label">Tuman</label>
+        <select class="input-field" id="districtSelect"></select>
+        <div id="map"></div>
+        <label class="field-label">Manzil izohi</label>
+        <input type="text" class="input-field" id="addressNote" placeholder="Mo'ljal, uy raqami...">
+        <label class="field-label">Telefon (+998)</label>
+        <input type="tel" class="input-field" id="phoneInput" placeholder="90 123 45 67" maxlength="12">
+        <span id="phoneError" class="hidden" style="font-size:12px;color:#dc2626">To'liq raqam kiriting</span>
+      </div>
+
+      <div class="wizard-step" data-step="8">
+        <h2>Xulosa va to'lov</h2>
+        <p class="sub">Buyurtmangizni tekshiring</p>
+        <div class="card-white" style="cursor:default">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Xizmat</span><b id="summaryService">—</b></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Bemor</span><b id="summaryPatient">—</b></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Vaqt</span><b id="summaryTime">—</b></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Yetkazish</span><b id="summaryDelivery">—</b></div>
+          <div style="display:flex;justify-content:space-between;font-size:17px;color:var(--blue);padding-top:12px;border-top:1px dashed #e2e8f0">
+            <span>Jami</span><b id="summaryTotal">—</b>
+          </div>
+        </div>
+        <textarea class="input-field" id="extraComplaint" rows="2" placeholder="Qo'shimcha shikoyat (ixtiyoriy)" style="height:auto;padding:12px"></textarea>
+        <p class="field-label">To'lov usuli</p>
+        <div class="pill-grid">
+          <button type="button" class="pill-btn" id="methodTpay" onclick="window.NMED.selectPayMethod('tpay')">💳 Karta orqali</button>
+          <button type="button" class="pill-btn" id="methodAdmin" onclick="window.NMED.selectPayMethod('admin')">🏦 Admin orqali</button>
+        </div>
+        <div id="adminPayBlock" class="payment-card-box hidden">
+          <div class="head">💳 Karta ma'lumotlari</div>
+          <div class="body">
+            <div style="font-size:11px;color:#92400e;font-weight:600">KARTA RAQAMI</div>
+            <div class="card-number" id="cardNumberDisplay">—</div>
+            <div id="cardHolderDisplay" style="margin-top:6px;color:#6b7280">—</div>
+            <p style="font-size:12px;color:#854d0e;margin:12px 0">To'lov qiling va chek rasmini yuklang</p>
+            <label style="display:block;background:#f59e0b;color:#fff;text-align:center;padding:14px;border-radius:12px;font-weight:700;cursor:pointer">
+              📸 Chek rasmini yuklash
+              <input type="file" id="paymentScreenshot" accept="image/*" style="display:none">
+            </label>
+            <span id="screenshotError" class="hidden" style="font-size:12px;color:#dc2626;display:block;text-align:center;margin-top:8px">Chek majburiy</span>
+            <div id="screenshotPreview" class="hidden" style="margin-top:12px;border-radius:12px;overflow:hidden">
+              <img id="screenshotPreviewImg" style="width:100%;max-height:180px;object-fit:cover" alt="">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <footer class="wizard-footer">
+      <button type="button" class="btn-primary" id="wizardNextBtn">Davom etish →</button>
+    </footer>
+  </section>
+
+  <!-- ORDERS -->
+  <section id="screen-orders" class="screen">
+    <div class="content-light">
+      <h2 style="margin:0 0 16px">🚚 Buyurtmalarim</h2>
+      <div id="ordersList"></div>
+    </div>
+  </section>
+
+  <!-- ORDER DETAIL -->
+  <section id="screen-order-detail" class="screen">
+    <div class="content-light" id="orderDetailContent"></div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="screen-results" class="screen">
+    <div class="content-light">
+      <h2 style="margin:0 0 16px">📊 Natijalarim</h2>
+      <div id="resultsList"></div>
+    </div>
+  </section>
+
+  <!-- PROFILE -->
+  <section id="screen-profile" class="screen">
+    <div class="content-light" id="profileContent"></div>
+  </section>
+
+  <!-- FEEDBACK -->
+  <section id="screen-feedback" class="screen">
+    <div class="content-light">
+      <h2 style="margin:0 0 8px">⭐️ Fikr & taklif</h2>
+      <p style="color:#64748b;font-size:13px;margin-bottom:16px">Fikringiz biz uchun muhim</p>
+      <textarea class="input-field" id="appealText" rows="5" placeholder="Xabaringizni yozing..." style="height:auto;padding:12px"></textarea>
+      <button type="button" class="btn-primary" id="btnAppealSend">Yuborish</button>
+    </div>
+  </section>
+
+  <!-- TRUST -->
+  <section id="screen-trust" class="screen">
+    <div class="content-light">
+      <h2 style="margin:0 0 16px">🛡️ Ishonch va kafolat</h2>
+      <div class="order-card" style="cursor:default"><span>🏥</span> Rasmiy laboratoriya hamkorligi</div>
+      <div class="order-card" style="cursor:default"><span>👨‍⚕️</span> Tajribali mutaxassislar</div>
+      <div class="order-card" style="cursor:default"><span>🧫</span> Steril konteyner va to'g'ri saqlash</div>
+      <div class="order-card" style="cursor:default"><span>📜</span> Xalqaro standartlarga moslik</div>
+      <div class="order-card" style="cursor:default"><span>🔒</span> 100% mijoz ma'lumotlari himoyasi</div>
+      <div class="order-card" style="cursor:default"><span>📱</span> Onlayn natija va arxiv</div>
+    </div>
+  </section>
+
+  <!-- SUPPORT -->
+  <section id="screen-support" class="screen">
+    <div class="content-light">
+      <h2 style="margin:0 0 16px">📞 Qo'llab-quvvatlash</h2>
+      <button type="button" class="btn-primary" id="btnSupportTg" style="margin-bottom:12px">✈️ Telegram orqali yozish</button>
+      <div class="order-card" style="cursor:default;text-align:center">
+        <p style="margin:0;color:#64748b;font-size:13px">Tez-tez so'raladigan savollar</p>
+        <p style="margin:8px 0 0;font-size:14px">Buyurtma, to'lov va natija haqida @support ga yozing</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="{% static 'js/nmed-webapp.js' %}"></script>
+</body>
+</html>

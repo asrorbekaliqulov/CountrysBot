@@ -272,13 +272,28 @@
     <div class="card">
       <div class="font-semibold mb-3">⚙️ Global Bot Sozlamalari</div>
       <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px">
+          <div class="font-semibold mb-2" style="color:#1d4ed8">💳 Admin orqali to'lov — karta</div>
+          <label class="text-sm text-muted">Karta raqami:</label>
+          <input type="text" class="input mt-1" id="set-card-number" placeholder="8600 1234 5678 9012" />
+          <label class="text-sm text-muted mt-2" style="display:block">Karta egasi (F.I.O):</label>
+          <input type="text" class="input mt-1" id="set-card-holder" placeholder="X. Alisher" />
+        </div>
         <div>
-          <label class="text-sm text-muted">Kuryer yetkazib berish narxi (so'm):</label>
+          <label class="text-sm text-muted">Standart yetkazish narxi (so'm, ma'lumot uchun):</label>
           <input type="number" class="input mt-1" id="set-delivery-fee" />
         </div>
         <div>
-          <label class="text-sm text-muted">Qo'llab-quvvatlash xizmati (Username/Link):</label>
+          <label class="text-sm text-muted">Qo'llab-quvvatlash (@username):</label>
           <input type="text" class="input mt-1" id="set-support" />
+        </div>
+        <div>
+          <label class="text-sm text-muted">Telefon raqam:</label>
+          <input type="text" class="input mt-1" id="set-support-phone" placeholder="+998901234567" />
+        </div>
+        <div>
+          <label class="text-sm text-muted">Telegram havola:</label>
+          <input type="text" class="input mt-1" id="set-support-tg" placeholder="https://t.me/..." />
         </div>
         <button class="btn btn-primary mt-2" onclick="saveSettings()">💾 Sozlamalarni Saqlash</button>
       </div>
@@ -769,12 +784,39 @@ async function loadDistricts() {
   const el = document.getElementById('districts-list-container');
   districtsData = await api(`/api/districts/?tg_id=${TG_ID}`) || [];
   if (!districtsData.length) { el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">Tumanlar mavjud emas.</div>'; return; }
-  let html = `<table class="table"><thead><tr><th>ID</th><th>Tuman Nomi</th><th>Viloyat</th></tr></thead><tbody>`;
+  let html = `<table class="table"><thead><tr><th>ID</th><th>Tuman</th><th>Viloyat</th><th>Yetkazish</th><th>Faol</th><th></th></tr></thead><tbody>`;
   districtsData.forEach(d => {
     const reg = regionsData.find(x => x.id === d.region);
-    html += `<tr><td><b>#${d.id}</b></td><td><span class="badge badge-orange">📍 ${d.name_uz || d.name}</span></td><td>${reg ? (reg.name_uz || reg.name) : `ID: ${d.region}`}</td></tr>`;
+    const active = d.is_active === true || d.is_active === 'true' || d.is_active === 1;
+    html += `<tr>
+      <td><b>#${d.id}</b></td>
+      <td>${esc(d.name_uz || d.name)}</td>
+      <td>${reg ? esc(reg.name_uz || reg.name) : d.region}</td>
+      <td><input type="number" class="input" id="dist-price-${d.id}" value="${d.delivery_price||0}" style="width:100px;padding:6px"/></td>
+      <td><select class="select" id="dist-active-${d.id}" style="width:80px;padding:6px;font-size:12px">
+        <option value="true" ${active?'selected':''}>Ha</option>
+        <option value="false" ${!active?'selected':''}>Yo'q</option>
+      </select></td>
+      <td><button class="btn btn-primary btn-sm" onclick="saveDistrict(${d.id})">💾</button></td>
+    </tr>`;
   });
   el.innerHTML = html + '</tbody></table>';
+}
+
+async function saveDistrict(id) {
+  const price = parseInt(document.getElementById(`dist-price-${id}`).value, 10) || 0;
+  const is_active = document.getElementById(`dist-active-${id}`).value === 'true';
+  const res = await api(`/api/districts/${id}/?tg_id=${TG_ID}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ delivery_price: price, is_active })
+  });
+  if (res && !res.error) {
+    showToast('📍 Tuman yangilandi!');
+    loadDistricts();
+  } else {
+    alert('Xatolik: ' + (res?.error || 'Saqlanmadi'));
+  }
 }
 
 async function createNewDistrict() {
@@ -889,10 +931,21 @@ async function loadSettings() {
   if (data) {
     document.getElementById('set-delivery-fee').value = data.delivery_fee||0;
     document.getElementById('set-support').value = data.support_contact||'';
+    document.getElementById('set-card-number').value = data.payment_card_number||'';
+    document.getElementById('set-card-holder').value = data.payment_card_holder||'';
+    document.getElementById('set-support-phone').value = data.support_phone||'';
+    document.getElementById('set-support-tg').value = data.support_telegram||'';
   }
 }
 async function saveSettings() {
-  const data = { delivery_fee: parseFloat(document.getElementById('set-delivery-fee').value)||0, support_contact: document.getElementById('set-support').value.trim() };
+  const data = {
+    delivery_fee: parseFloat(document.getElementById('set-delivery-fee').value)||0,
+    support_contact: document.getElementById('set-support').value.trim(),
+    payment_card_number: document.getElementById('set-card-number').value.trim(),
+    payment_card_holder: document.getElementById('set-card-holder').value.trim(),
+    support_phone: document.getElementById('set-support-phone').value.trim(),
+    support_telegram: document.getElementById('set-support-tg').value.trim(),
+  };
   const res = await api(`/api/admin/settings/?tg_id=${TG_ID}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
   if (res?.success) { showToast('⚙️ Sozlamalar saqlandi!'); }
 }

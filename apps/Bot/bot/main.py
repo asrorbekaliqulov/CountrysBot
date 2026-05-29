@@ -68,7 +68,7 @@ def main():
 
     app.add_handler(CallbackQueryHandler(
         main_menu_callback,
-        pattern="^(feedback|contact_us|admin_panel|back_to_menu)$"
+        pattern="^(feedback|contact_us|appeal|admin_panel|back_to_menu)$"
     ))
     # Message handlers
     app.add_handler(MessageHandler(filters.TEXT & filters.REPLY, handle_admin_reply))

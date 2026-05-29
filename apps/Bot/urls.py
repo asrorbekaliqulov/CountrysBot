@@ -10,6 +10,15 @@ Asosiy urls.py da:
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
+from apps.Bot.views.webapp_user import (
+    webapp_view,
+    webapp_public_settings_api,
+    webapp_profile_api,
+    webapp_orders_api,
+    webapp_order_detail_api,
+    webapp_results_api,
+    webapp_appeal_api,
+)
 from apps.Bot.views.base import (
     # ViewSets
     OrderViewSet, RegionViewSet, DistrictViewSet, BotSettingViewSet,
@@ -75,8 +84,15 @@ urlpatterns = [
     # ─────────────────────────────────────────────────────────────────────────
 
 
-    # ── WebApp Wizard ─────────────────────────────────────────────────────────
+    # ── Foydalanuvchi WebApp ──────────────────────────────────────────────────
+    path('webapp/', webapp_view, name='webapp'),
     path('webapp/wizard/', wizard_view, name='webapp-wizard'),
+    path('webapp/settings/', webapp_public_settings_api, name='webapp-public-settings'),
+    path('webapp/profile/', webapp_profile_api, name='webapp-profile'),
+    path('webapp/orders/', webapp_orders_api, name='webapp-orders'),
+    path('webapp/orders/<int:order_id>/', webapp_order_detail_api, name='webapp-order-detail'),
+    path('webapp/results/', webapp_results_api, name='webapp-results'),
+    path('webapp/appeal/', webapp_appeal_api, name='webapp-appeal'),
 
     # ── Admin Panel ───────────────────────────────────────────────────────────
     path('admin-panel/',     admin_panel_view,     name='admin_panel'),

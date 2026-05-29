@@ -149,6 +149,22 @@ class DistrictViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+    def partial_update(self, request, *args, **kwargs):
+        if not is_admin_user(request):
+            return Response({'error': 'Ruxsat berilmagan'}, status=status.HTTP_403_FORBIDDEN)
+        instance = self.get_object()
+        if 'is_active' in request.data:
+            instance.is_active = request.data['is_active'] in (True, 'true', '1', 1)
+        if 'delivery_price' in request.data:
+            try:
+                instance.delivery_price = int(request.data['delivery_price'])
+            except (TypeError, ValueError):
+                pass
+        if 'name_uz' in request.data and request.data['name_uz']:
+            instance.name = request.data['name_uz']
+        instance.save()
+        return Response(self.get_serializer(instance).data)
+
     def create(self, request, *args, **kwargs):
         if not is_admin_user(request):
             return Response({'error': 'Ruxsat berilmagan'}, status=status.HTTP_403_FORBIDDEN)
@@ -251,10 +267,9 @@ class OrderViewSet(viewsets.ModelViewSet):
             key=lambda c: (c.active_count, c.first_order_time or datetime.now())
         )[0]
 
-        order.courier = chosen
-        order.status  = 'paid'
-        order.save(update_fields=['status', 'courier'])
-        logger.info("[Courier] Order #%s → TG_ID: %s", order.id, chosen.user_id)
+        order.status = 'paid'
+        order.save(update_fields=['status'])
+        logger.info("[Courier] Order #%s → kuryer TG_ID: %s (buyurtmaga courier FK yo'q)", order.id, chosen.user_id)
         return chosen
 
     # ── Buyurtma yaratish — to'lov boshlash tspay_payment.py ga ko'chirildi ──
@@ -476,11 +491,17 @@ class StaffMeAPIView(APIView):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def wizard_view(request):
-    user_lang = request.GET.get('lang')
-    if user_lang in ['uz', 'ru', 'en']:
-        translation.activate(user_lang)
-        request.LANGUAGE_CODE = user_lang
-    return render(request, 'wizard.html')
+    """Eski havola — yangi webapp buyurtma oqimiga yo'naltiradi."""
+    from django.shortcuts import redirect
+    from urllib.parse import urlencode
+
+    q = {}
+    if request.GET.get('lang'):
+        q['lang'] = request.GET.get('lang')
+    if request.GET.get('tg_id'):
+        q['tg_id'] = request.GET.get('tg_id')
+    q['page'] = 'order'
+    return redirect('/api/webapp/?' + urlencode(q))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -677,24 +698,21 @@ def admin_services_api(request):
 
 @csrf_exempt
 def admin_settings_api(request):
-    """GET/POST /api/admin/settings/"""
+    """GET/POST /api/admin/settings/ — BotSetting orqali saqlanadi."""
+    from apps.Bot.views.webapp_user import get_admin_settings_response, save_admin_settings_from_request
+
     tg_id = request.GET.get('tg_id')
     if not tg_id or not TelegramUser.objects.filter(user_id=tg_id).exists():
         return JsonResponse({'error': 'Ruxsat berilmagan'}, status=403)
 
     if request.method == 'GET':
-        return JsonResponse({
-            'bot_status':       True,
-            'maintenance_mode': False,
-            'delivery_fee':     20000.0,
-            'support_contact':  '@click_support_bot',
-            'bonus_percentage': 5,
-        })
+        return JsonResponse(get_admin_settings_response())
     elif request.method == 'POST':
         try:
             ct = request.content_type or ''
             data = request.POST if ct.startswith('multipart') else json.loads(request.body)
-            logger.info("[Settings] Yangi sozlamalar: %s", dict(data))
+            save_admin_settings_from_request(data)
+            logger.info("[Settings] Yangilandi: %s", list(data.keys()))
             return JsonResponse({'success': True, 'message': 'Sozlamalar saqlandi!'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)

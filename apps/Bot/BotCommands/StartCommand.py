@@ -72,9 +72,18 @@ def _clean_lang(lang: str) -> str:
     return code if code in ("uz", "ru", "en") else "uz"
 
 
+def _webapp_page_url(page: str, lang: str, user_id: int = None) -> str:
+    base = f"{WEB_APP_URL.rstrip('/')}/api/webapp/"
+    connector = "?"
+    full = f"{base}{connector}page={page}&lang={lang}"
+    if user_id:
+        full += f"&tg_id={user_id}"
+    return full
+
+
 async def get_main_menu_keyboard(
     user_lang: str = "uz",
-    webapp_url: str = f"{WEB_APP_URL}api/webapp/wizard/",
+    webapp_url: str = None,
     is_admin: bool = False,
     user_id: int = None,
 ) -> InlineKeyboardMarkup:
@@ -91,33 +100,40 @@ async def get_main_menu_keyboard(
     lang = _clean_lang(user_lang)
     t = BTN[lang]
 
-    # WebApp URL-ga til parametrini qo'shamiz
-    connector = "&" if "?" in webapp_url else "?"
-    full_url = f"{webapp_url}{connector}lang={lang}"
-    if user_id:
-        full_url += f"&tg_id={user_id}"
+    order_url = webapp_url or _webapp_page_url("order", lang, user_id)
 
     keyboard = [
-        # 1-qator: WebApp tugmasi (katta, butun qator)
         [
             InlineKeyboardButton(
                 text=t["order"],
-                web_app=WebAppInfo(url=full_url),
+                web_app=WebAppInfo(url=order_url),
             )
         ],
-        # 2-qator
         [
-            InlineKeyboardButton(text=t["results"],      callback_data="my_results"),
-            InlineKeyboardButton(text=t["order_status"], callback_data="order_status"),
+            InlineKeyboardButton(
+                text=t["results"],
+                web_app=WebAppInfo(url=_webapp_page_url("results", lang, user_id)),
+            ),
+            InlineKeyboardButton(
+                text=t["order_status"],
+                web_app=WebAppInfo(url=_webapp_page_url("orders", lang, user_id)),
+            ),
         ],
-        # 3-qator
         [
-            InlineKeyboardButton(text=t["profile"],  callback_data="my_profile"),
-            InlineKeyboardButton(text=t["feedback"], callback_data="feedback"),
+            InlineKeyboardButton(
+                text=t["profile"],
+                web_app=WebAppInfo(url=_webapp_page_url("profile", lang, user_id)),
+            ),
+            InlineKeyboardButton(
+                text=t["feedback"],
+                web_app=WebAppInfo(url=_webapp_page_url("feedback", lang, user_id)),
+            ),
         ],
-        # 4-qator
         [
-            InlineKeyboardButton(text=t["contact"], callback_data="appeal"),
+            InlineKeyboardButton(
+                text=t["contact"],
+                web_app=WebAppInfo(url=_webapp_page_url("support", lang, user_id)),
+            ),
         ],
     ]
 
@@ -246,7 +262,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── 6. Oddiy foydalanuvchi — asosiy menyu ────────────────────────────────────
     reply_markup = await get_main_menu_keyboard(
         user_lang=lang,
-        webapp_url=f"{WEB_APP_URL}api/webapp/wizard/",
         is_admin=is_admin,
         user_id=tg_user.id,
     )
@@ -288,27 +303,21 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     # Har bir tugma uchun mos handler chaqiriladi.
     # Siz o'z handler fayllaringizdan import qilib, shu yerda chaqiring.
-    if data == "my_results":
-        # from ..handlers.results import send_results
-        # await send_results(update, context)
-        await query.message.reply_text("📊 Natijalar bo'limi tez orada...")
+    if data in ("my_results", "order_status", "my_profile", "feedback"):
+        page_map = {
+            "my_results": "results",
+            "order_status": "orders",
+            "my_profile": "profile",
+            "feedback": "feedback",
+        }
+        url = _webapp_page_url(page_map[data], lang, tg_user.id)
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("📱 WebAppni ochish", web_app=WebAppInfo(url=url))
+        ]])
+        await query.message.reply_text("Bo'limni WebAppda oching 👇", reply_markup=kb)
+        return
 
-    elif data == "order_status":
-        # from ..handlers.orders import send_order_status
-        # await send_order_status(update, context)
-        await query.message.reply_text("🚚 Buyurtma holati bo'limi tez orada...")
-
-    elif data == "my_profile":
-        # from ..handlers.profile import send_profile
-        # await send_profile(update, context)
-        await query.message.reply_text("👤 Profil bo'limi tez orada...")
-
-    elif data == "feedback":
-        # from ..handlers.feedback import send_feedback
-        # await send_feedback(update, context)
-        await query.message.reply_text("⭐️ Fikr & shikoyat bo'limi tez orada...")
-
-    elif data == "contact_us":
+    elif data == "contact_us" or data == "appeal":
         contacts = {
             "uz": "📞 Biz bilan bog'lanish:\n\n🌐 Sayt: https://1wash.uz\n📱 Telegram: @support",
             "ru": "📞 Связаться с нами:\n\n🌐 Сайт: https://1wash.uz\n📱 Telegram: @support",
