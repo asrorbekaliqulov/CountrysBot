@@ -106,6 +106,12 @@ def _order_timeline(status: str) -> list:
 
 def webapp_view(request):
     user_lang = request.GET.get('lang')
+    if user_lang not in ('uz', 'ru', 'en'):
+        tg_id = request.GET.get('tg_id')
+        if tg_id:
+            user = _get_user_or_none(tg_id)
+            if user and user.lang in ('uz', 'ru', 'en'):
+                user_lang = user.lang
     if user_lang in ('uz', 'ru', 'en'):
         translation.activate(user_lang)
         request.LANGUAGE_CODE = user_lang
@@ -146,6 +152,7 @@ def webapp_profile_api(request):
         'first_name': user.first_name or '',
         'username': user.username or '',
         'lang': user.lang or 'uz',
+        'lang_chosen': user.lang_chosen,
         'bonus_points': user.bonus_points,
         'order_count': user.order_count,
         'total_orders': total,

@@ -84,9 +84,20 @@ class CourierOrderSerializer(serializers.ModelSerializer):
 
 
 class ServiceSerializer(serializers.ModelSerializer):
+    icon_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Service
         fields = '__all__'
+
+    def get_icon_url(self, obj):
+        if obj.icon:
+            request = self.context.get('request')
+            url = obj.icon.url
+            if request:
+                return request.build_absolute_uri(url)
+            return url
+        return None
 
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -97,23 +108,40 @@ class PaymentSerializer(serializers.ModelSerializer):
 class OrderCreateSerializer(serializers.ModelSerializer):
     payment_method = serializers.CharField(write_only=True)
     screenshot = serializers.ImageField(required=False, write_only=True)
+    phone = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = Order
         fields = '__all__'
-        read_only_fields = ['user', 'base_price', 'extra_fee', 'total_price', 'status']
+        read_only_fields = ['user', 'base_price', 'extra_fee', 'total_price', 'status', 'courier']
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        payment_method = self.initial_data.get('payment_method')
+        if payment_method == 'admin':
+            has_file = bool(self.initial_data.get('screenshot'))
+            if request and hasattr(request, 'FILES') and request.FILES.get('screenshot'):
+                has_file = True
+            if not has_file:
+                raise serializers.ValidationError({'screenshot': 'Admin to\'lovi uchun chek rasmi majburiy'})
+        if payment_method not in ('admin', 'tpay'):
+            raise serializers.ValidationError({'payment_method': 'To\'lov usulini tanlang'})
+        return attrs
 
     def create(self, validated_data):
         payment_method = validated_data.pop('payment_method')
         screenshot = validated_data.pop('screenshot', None)
+        phone = validated_data.pop('phone', None)
+        if phone:
+            validated_data['contact_phone'] = phone
         
         # Hisob-kitob (Tuman yetkazish narxi + Xizmat narxi)
         service = validated_data['service']
         district = validated_data['district']
         
         base_price = service.price
-        extra_fee = district.delivery_price
-        total_price = base_price + extra_fee
+        extra_fee = 0
+        total_price = base_price
         
         validated_data['base_price'] = base_price
         validated_data['extra_fee'] = extra_fee

@@ -13,7 +13,7 @@
 <style>
   :root{
     --bg:#f8fafc; --card:#fff; --border:#e2e8f0; --text:#0f172a;
-    --muted:#64748b; --primary:#4f46e5; --primary-2:#4338ca;
+    --muted:#64748b; --primary:#0c1a33; --primary-2:#1a3358; --gold:#d4a017;
     --green:#16a34a; --red:#dc2626; --orange:#ea580c; --blue:#2563eb;
     --light-blue:#eff6ff;
   }
@@ -193,8 +193,12 @@
       <div class="font-semibold mb-2" style="font-size:14px">➕ Yangi Xizmat/Tahlil Qo'shish</div>
       <div class="form-grid-2">
         <input type="text" class="input" id="new-service-name" placeholder="Xizmat nomi (UZ)" />
-        <input type="number" class="input" id="new-service-price" placeholder="Narxi (so'mda)" />
+        <input type="number" class="input" id="new-service-price" placeholder="Narxi (so'mda, yetkazish bilan)" />
       </div>
+      <input type="text" class="input" id="new-service-desc" placeholder="Qisqa tavsif (masalan: gijja tahlili)" style="margin-bottom:8px"/>
+      <label class="text-sm text-muted" style="display:block;margin-bottom:4px">Ikonka (PNG/JPG, 128x128 tavsiya etiladi):</label>
+      <input type="file" class="input" id="new-service-icon" accept="image/*" style="margin-bottom:8px;padding:8px"/>
+      <div id="new-service-icon-preview" style="margin-bottom:8px"></div>
       <button class="btn btn-success btn-block" onclick="createNewService()">🚀 Xizmatni Qo'shish</button>
     </div>
     <div class="card" style="padding:12px">
@@ -215,6 +219,7 @@
         <select class="select" id="new-district-region" style="margin-bottom:8px;margin-top:4px">
           <option value="">-- Viloyatni tanlang --</option>
         </select>
+        <input type="number" class="input" id="new-district-price" placeholder="Yetkazish narxi (so'm)" value="20000" style="margin-bottom:8px"/>
         <button class="btn btn-success btn-block" onclick="createNewDistrict()">📍 Tumanni Qo'shish</button>
       </div>
       <div class="card" style="margin-bottom:0;background:#fdfdfd">
@@ -680,7 +685,7 @@ async function approveAdminPayment() {
   btn.textContent = '⏳ Tasdiqlanmoqda...';
 
   try {
-    const res = await fetch(`/tspay/order/${id}/confirm_payment/?tg_id=${TG_ID}`, {
+    const res = await fetch(`/tspay/orders/${id}/confirm_payment/?tg_id=${TG_ID}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_admin: true }),
@@ -730,10 +735,17 @@ async function loadServices() {
   const el = document.getElementById('services-list-container');
   servicesData = await api(`/api/admin/services/?tg_id=${TG_ID}`) || [];
   if (!servicesData.length) { el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">Xizmatlar topilmadi.</div>'; return; }
-  let html = `<table class="table"><thead><tr><th>Xizmat Nomi</th><th>Narxi</th><th>Holat</th><th></th></tr></thead><tbody>`;
+  let html = `<table class="table"><thead><tr><th>Ikonka</th><th>Xizmat</th><th>Narxi</th><th>Holat</th><th></th></tr></thead><tbody>`;
   servicesData.forEach(s => {
+    const iconCell = s.icon_url
+      ? `<img src="${s.icon_url}" style="width:40px;height:40px;border-radius:8px;object-fit:cover" alt="">`
+      : `<span style="font-size:24px">🧪</span>`;
     html += `<tr>
-      <td><b>${esc(s.name_uz)}</b></td>
+      <td>${iconCell}<input type="file" id="icon-${s.id}" accept="image/*" style="font-size:10px;margin-top:4px;width:80px"/></td>
+      <td>
+        <b>${esc(s.name_uz)}</b>
+        <input type="text" class="input" id="desc-${s.id}" value="${esc(s.description || '')}" placeholder="Qisqa tavsif" style="width:100%;padding:4px;font-size:11px;margin-top:4px"/>
+      </td>
       <td><input type="number" class="input" id="price-${s.id}" value="${s.price}" style="width:110px;padding:6px"/></td>
       <td><select class="select" id="active-${s.id}" style="width:90px;padding:6px;font-size:12px">
         <option value="true" ${s.is_active?'selected':''}>Faol</option>
@@ -748,22 +760,56 @@ async function loadServices() {
 async function createNewService() {
   const nameUz = document.getElementById('new-service-name').value.trim();
   const price = parseFloat(document.getElementById('new-service-price').value);
+  const description = document.getElementById('new-service-desc').value.trim();
+  const iconFile = document.getElementById('new-service-icon').files[0];
   if (!nameUz || !price) { alert("Xizmat nomi va narxini kiriting!"); return; }
-  const res = await api(`/api/services/?tg_id=${TG_ID}`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ name_uz: nameUz, price, is_active: true })
-  });
-  if (res) { showToast('🚀 Xizmat qo\'shildi!'); document.getElementById('new-service-name').value=''; document.getElementById('new-service-price').value=''; loadServices(); }
+  const fd = new FormData();
+  fd.append('name_uz', nameUz);
+  fd.append('price', price);
+  fd.append('is_active', 'true');
+  if (description) fd.append('description', description);
+  if (iconFile) fd.append('icon', iconFile);
+  const res = await fetch(`/api/services/?tg_id=${TG_ID}`, { method: 'POST', body: fd });
+  if (res.ok) {
+    showToast('🚀 Xizmat qo\'shildi!');
+    document.getElementById('new-service-name').value='';
+    document.getElementById('new-service-price').value='';
+    document.getElementById('new-service-desc').value='';
+    document.getElementById('new-service-icon').value='';
+    document.getElementById('new-service-icon-preview').innerHTML='';
+    loadServices();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    alert('❌ ' + (err.detail || JSON.stringify(err) || 'Xatolik'));
+  }
 }
 
 async function saveService(id) {
   const price = parseFloat(document.getElementById(`price-${id}`).value) || 0;
   const is_active = document.getElementById(`active-${id}`).value === 'true';
-  const res = await api(`/api/admin/services/?tg_id=${TG_ID}`, {
-    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, price, is_active})
-  });
-  if (res?.success) { showToast('🩺 Narx yangilandi!'); loadServices(); }
+  const description = document.getElementById(`desc-${id}`).value.trim();
+  const iconFile = document.getElementById(`icon-${id}`)?.files[0];
+  const fd = new FormData();
+  fd.append('id', id);
+  fd.append('price', price);
+  fd.append('is_active', is_active);
+  fd.append('description', description);
+  if (iconFile) fd.append('icon', iconFile);
+  const res = await fetch(`/api/admin/services/?tg_id=${TG_ID}`, { method: 'POST', body: fd });
+  const data = await res.json().catch(() => ({}));
+  if (data?.success) { showToast('🩺 Xizmat yangilandi!'); loadServices(); }
+  else alert('❌ ' + (data?.error || 'Xatolik'));
 }
+
+document.getElementById('new-service-icon')?.addEventListener('change', function() {
+  const preview = document.getElementById('new-service-icon-preview');
+  if (!preview) return;
+  if (this.files?.[0]) {
+    const r = new FileReader();
+    r.onload = (e) => { preview.innerHTML = `<img src="${e.target.result}" style="width:64px;height:64px;border-radius:12px;object-fit:cover"/>`; };
+    r.readAsDataURL(this.files[0]);
+  } else preview.innerHTML = '';
+});
 
 // ── TUMANLAR ──────────────────────────────────────────────────────────────────
 async function loadRegions() {
@@ -784,14 +830,16 @@ async function loadDistricts() {
   const el = document.getElementById('districts-list-container');
   districtsData = await api(`/api/districts/?tg_id=${TG_ID}`) || [];
   if (!districtsData.length) { el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">Tumanlar mavjud emas.</div>'; return; }
-  let html = `<table class="table"><thead><tr><th>ID</th><th>Tuman</th><th>Viloyat</th><th>Yetkazish</th><th>Faol</th><th></th></tr></thead><tbody>`;
+  let html = `<table class="table"><thead><tr><th>ID</th><th>Tuman</th><th>Viloyat</th><th>Geo</th><th>Yetkazish</th><th>Faol</th><th></th></tr></thead><tbody>`;
   districtsData.forEach(d => {
     const reg = regionsData.find(x => x.id === d.region);
     const active = d.is_active === true || d.is_active === 'true' || d.is_active === 1;
+    const geoOk = d.geo_fetched && d.latitude && d.longitude;
     html += `<tr>
       <td><b>#${d.id}</b></td>
       <td>${esc(d.name_uz || d.name)}</td>
       <td>${reg ? esc(reg.name_uz || reg.name) : d.region}</td>
+      <td>${geoOk ? '✅' : '❌'} <button class="btn btn-sm" style="padding:4px 8px;font-size:11px" onclick="refreshDistrictGeo(${d.id})">🔄</button></td>
       <td><input type="number" class="input" id="dist-price-${d.id}" value="${d.delivery_price||0}" style="width:100px;padding:6px"/></td>
       <td><select class="select" id="dist-active-${d.id}" style="width:80px;padding:6px;font-size:12px">
         <option value="true" ${active?'selected':''}>Ha</option>
@@ -819,12 +867,31 @@ async function saveDistrict(id) {
   }
 }
 
+async function refreshDistrictGeo(id) {
+  const res = await api(`/api/districts/${id}/refresh-geo/?tg_id=${TG_ID}`, { method: 'POST' });
+  if (res?.success) {
+    showToast('✅ Koordinatalar yangilandi');
+    loadDistricts();
+  } else {
+    alert('Geopy koordinata olmadi. Tuman nomini tekshiring.');
+  }
+}
+
 async function createNewDistrict() {
   const dName = document.getElementById('new-district-name').value.trim();
   const regId = document.getElementById('new-district-region').value;
+  const price = parseInt(document.getElementById('new-district-price')?.value || '20000', 10) || 20000;
   if (!dName || !regId) { alert("Tuman nomi va viloyatni tanlang!"); return; }
-  const res = await api(`/api/districts/?tg_id=${TG_ID}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name_uz: dName, region: parseInt(regId)}) });
-  if (res) { showToast('📍 Tuman qo\'shildi!'); document.getElementById('new-district-name').value=''; loadDistricts(); }
+  const res = await api(`/api/districts/?tg_id=${TG_ID}`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name_uz: dName, region: parseInt(regId), is_active: true, delivery_price: price })
+  });
+  if (res) {
+    showToast(res.geo_fetched ? '📍 Tuman + geo qo\'shildi!' : '📍 Tuman qo\'shildi (geo keyin 🔄)');
+    document.getElementById('new-district-name').value='';
+    loadDistricts();
+  }
 }
 
 // ── XODIMLAR ──────────────────────────────────────────────────────────────────

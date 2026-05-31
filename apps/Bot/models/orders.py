@@ -12,7 +12,8 @@ class Service(models.Model):
     name_ru = models.CharField(max_length=255, verbose_name="Nomi (RU)")
     name_en = models.CharField(max_length=255, verbose_name="Nomi (EN)")
     price = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Narxi (UZS)")
-    description = models.TextField(blank=True, null=True, verbose_name="Tavsif")
+    description = models.TextField(blank=True, null=True, verbose_name="Tavsif (qisqa)")
+    icon = models.ImageField(upload_to="service_icons/", blank=True, null=True, verbose_name="Ikonka")
     is_active = models.BooleanField(default=True, verbose_name="Faol")
 
     class Meta:
@@ -61,7 +62,18 @@ class Order(models.Model):
     address_note = models.TextField(blank=True, null=True, verbose_name="Manzil izohi")
     latitude = models.FloatField(verbose_name="Kenglik", blank=True, null=True)
     longitude = models.FloatField(verbose_name="Uzunlik", blank=True, null=True)
-    
+    contact_phone = models.CharField(
+        max_length=20, blank=True, null=True, verbose_name="Aloqa telefoni"
+    )
+    courier = models.ForeignKey(
+        TelegramUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_orders",
+        verbose_name="Kuryer",
+    )
+
     # Moliyaviy va holat qismlari
     base_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     extra_fee = models.DecimalField(max_digits=12, decimal_places=2, default=0.0)

@@ -27,6 +27,7 @@ from django.core.files.base import ContentFile
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -177,7 +178,31 @@ class DistrictViewSet(viewsets.ModelViewSet):
         except Region.DoesNotExist:
             return Response({'error': 'Bunday ID dagi viloyat topilmadi'}, status=status.HTTP_400_BAD_REQUEST)
         district = District.objects.create(name=name_uz, region=region_obj)
-        return Response(self.get_serializer(district).data, status=status.HTTP_201_CREATED)
+        if request.data.get("is_active") in (True, "true", "1", 1):
+            district.is_active = True
+        if request.data.get("delivery_price") not in (None, ""):
+            try:
+                district.delivery_price = int(request.data["delivery_price"])
+            except (TypeError, ValueError):
+                pass
+        district.save()
+        district.fetch_coordinates(force=True)
+        payload = self.get_serializer(district).data
+        payload["geo_fetched"] = district.geo_fetched
+        return Response(payload, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="refresh-geo")
+    def refresh_geo(self, request, pk=None):
+        if not is_admin_user(request):
+            return Response({"error": "Ruxsat berilmagan"}, status=status.HTTP_403_FORBIDDEN)
+        district = self.get_object()
+        ok = district.fetch_coordinates(force=True)
+        return Response({
+            "success": ok,
+            "geo_fetched": district.geo_fetched,
+            "latitude": district.latitude,
+            "longitude": district.longitude,
+        })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -189,6 +214,12 @@ class ServiceViewSet(viewsets.ModelViewSet):
     serializer_class = ServiceSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
 
     def _normalize_names(self, data):
         """name_uz/name_ru/name_en ni bitta kelgan nomdan to'ldiradi."""
@@ -230,47 +261,9 @@ class OrderViewSet(viewsets.ModelViewSet):
     authentication_classes = []
 
     def _auto_assign_courier(self, order):
-        """
-        To'lov tasdiqlangandan so'ng tumandagi bo'sh kuryerga biriktiradi.
-        Bo'sh kuryer yo'q bo'lsa — eng kam yukli kuryerga.
-        """
-        if not order.district:
-            logger.warning("[Courier] Order #%s — district yo'q.", order.id)
-            order.status = 'paid'
-            order.save(update_fields=['status'])
-            return None
+        from apps.Bot.services.courier_assign import assign_courier_to_order
 
-        couriers = TelegramUser.objects.filter(
-            role='courier',
-            district=order.district,
-            is_active=True,
-        )
-        if not couriers.exists():
-            logger.warning("[Courier] %s tumanida kuryer topilmadi.", order.district.name)
-            order.status = 'paid'
-            order.save(update_fields=['status'])
-            return None
-
-        couriers_stats = couriers.annotate(
-            active_count=Count(
-                'assigned_orders',
-                filter=Q(assigned_orders__status__in=['paid', 'delivering'])
-            ),
-            first_order_time=Min(
-                'assigned_orders__created_at',
-                filter=Q(assigned_orders__status__in=['paid', 'delivering'])
-            )
-        )
-        free = [c for c in couriers_stats if c.active_count == 0]
-        chosen = free[0] if free else sorted(
-            couriers_stats,
-            key=lambda c: (c.active_count, c.first_order_time or datetime.now())
-        )[0]
-
-        order.status = 'paid'
-        order.save(update_fields=['status'])
-        logger.info("[Courier] Order #%s → kuryer TG_ID: %s (buyurtmaga courier FK yo'q)", order.id, chosen.user_id)
-        return chosen
+        return assign_courier_to_order(order, notify=True)
 
     # ── Buyurtma yaratish — to'lov boshlash tspay_payment.py ga ko'chirildi ──
     # Bu yerda faqat admin panel uchun qo'shimcha actionlar qoladi.
@@ -676,19 +669,44 @@ def admin_services_api(request):
 
     if request.method == 'GET':
         services = Service.objects.all().order_by('id')
-        return JsonResponse([{
-            'id': s.id, 'name_uz': s.name_uz, 'price': float(s.price), 'is_active': s.is_active
-        } for s in services], safe=False)
+        data = []
+        for s in services:
+            icon_url = s.icon.url if s.icon else None
+            data.append({
+                'id': s.id,
+                'name_uz': s.name_uz,
+                'description': s.description or '',
+                'price': float(s.price),
+                'is_active': s.is_active,
+                'icon_url': icon_url,
+            })
+        return JsonResponse(data, safe=False)
 
     elif request.method == 'POST':
         try:
-            data = json.loads(request.body)
-            svc = Service.objects.get(id=data.get('id'))
-            if 'price' in data:
-                svc.price = data['price']
-            if 'is_active' in data:
-                svc.is_active = data['is_active']
-            svc.save()
+            ct = request.content_type or ''
+            if ct.startswith('multipart'):
+                svc_id = request.POST.get('id')
+                svc = Service.objects.get(id=svc_id)
+                if 'price' in request.POST:
+                    svc.price = request.POST['price']
+                if 'is_active' in request.POST:
+                    svc.is_active = request.POST['is_active'] in ('true', 'True', '1', True)
+                if 'description' in request.POST:
+                    svc.description = request.POST['description']
+                if request.FILES.get('icon'):
+                    svc.icon = request.FILES['icon']
+                svc.save()
+            else:
+                data = json.loads(request.body)
+                svc = Service.objects.get(id=data.get('id'))
+                if 'price' in data:
+                    svc.price = data['price']
+                if 'is_active' in data:
+                    svc.is_active = data['is_active']
+                if 'description' in data:
+                    svc.description = data['description']
+                svc.save()
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)

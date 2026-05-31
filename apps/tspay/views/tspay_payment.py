@@ -121,11 +121,14 @@ def create_order_with_payment(request):
     except TelegramUser.DoesNotExist:
         return JsonResponse({'success': False, 'detail': 'Foydalanuvchi topilmadi'}, status=400)
 
-    serializer = OrderCreateSerializer(data=request.data)
+    serializer = OrderCreateSerializer(data=request.data, context={'request': request})
     if not serializer.is_valid():
-        return JsonResponse({'success': False, 'detail': serializer.errors}, status=400)
+        errs = serializer.errors
+        detail = errs.get('detail') or errs.get('non_field_errors') or errs
+        return JsonResponse({'success': False, 'detail': detail}, status=400)
 
     order   = serializer.save(user=user)
+    order_code = f'NMED-{order.id:05d}'
     payment = order.payment   # OrderCreateSerializer ichida yaratiladi
 
     # ── Admin (qo'lda) to'lov ─────────────────────────────────────────────────
@@ -135,6 +138,7 @@ def create_order_with_payment(request):
             'success':        True,
             'payment_method': 'admin',
             'order_id':       order.id,
+            'order_code':     order_code,
             'message':        "Buyurtma saqlandi. Chek tasvirini yuboring.",
         }, status=201)
 
@@ -158,6 +162,7 @@ def create_order_with_payment(request):
                 'success':        True,
                 'payment_method': 'tpay',
                 'order_id':       order.id,
+                'order_code':     order_code,
                 'cheque_id':      result['cheque_id'],
                 'payment_url':    result['payment_url'],
             }, status=201)

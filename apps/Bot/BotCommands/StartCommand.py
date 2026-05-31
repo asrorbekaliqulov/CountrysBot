@@ -16,15 +16,43 @@ from ..decorators import typing_action, mandatory_channel_required
 # ─── WebApp URL ────────────────────────────────────────────────────────────────
 WEB_APP_URL = os.getenv(
     "WEB_APP_URL",
-    "https://manor-estate-secretariat-strategy.trycloudflare.com/"
+    "https://n-medhomelab.uz/",
 )
 
 # ─── TRANSLATIONS ──────────────────────────────────────────────────────────────
 MESSAGES = {
     "welcome": {
-        "uz": "👋 Xush kelibsiz!\n\n🏥 N-MedHomeLab — uy sharoitida professional tibbiy tahlil xizmati.\nKuryerimiz sizga maxsus konteynerni yetkazib beradi, tahlil natijasini esa bot orqali onlayn tarzda qulay olasiz.\n\nQuyidagilardan birini tanlang 👇",
-        "ru": "👋 Добро пожаловать!\n\n🏥 N-MedHomeLab — профессиональные медицинские анализы на дому.\nКурьер доставит вам специальный контейнер, а результаты анализов вы сможете удобно получить онлайн прямо через бот.\n\nВыберите один из вариантов 👇",
-        "en": "👋 Welcome!\n\n🏥 <b>N-MedHomeLab</b> — professional home medical analysis.\nA courier will deliver a special container to you, and you can conveniently receive your test results online via the bot.\n\nPlease choose one of the options below 👇"
+        "uz": """🖤 Assalomu alaykum,
+NMED HOME LAB ga xush kelibsiz. Siz premium xizmatimizdan foydalanayotganingizdan mamnunmiz.
+
+🚚 Maxsus konteyner xodimlarimiz tomonidan uyingizga yetkaziladi
+🧪 3 kun davomida namunadan kerakli qism konteynerga joylashtiriladi
+📦 Tayyor namuna laboratoriyamizga yuboriladi
+🔬 Tekshiruv professional standart asosida amalga oshiriladi
+📊 Natijalar online tarzda yuboriladi
+
+✨ Laboratoriya endi uyingizda.
+""",
+        "ru": """🖤 Добро пожаловать в NMED HOME LAB. Мы рады, что вы пользуетесь нашим премиум-сервисом.
+
+    🚚 Специальный контейнер доставят вам домой наши сотрудники.
+    🧪 На 3 дня необходимая часть образца помещается в контейнер
+    📦 Готовый образец отправляется в нашу лабораторию.
+    🔬 Проверка проводится на основании профессиональных стандартов
+    📊 Результаты будут отправлены онлайн
+
+    ✨Лаборатория теперь дома.
+    """,
+        "en": """🖤 Welcome to NMED HOME LAB. We are happy that you are using our premium service.
+
+    🚚 Our employees will deliver the special container to your home.
+    🧪 The necessary part of the sample is placed in the container in 3 days
+    📦 The ready sample is sent to our laboratory.
+    🔬 The check is carried out according to professional standards
+    📊 The results are sent online
+
+    ✨ The laboratory is now at home.
+    """
     },
 }
 
@@ -64,6 +92,82 @@ ADMIN_BTN = {
 }
 
 
+# ─── Til tanlash ───────────────────────────────────────────────────────────────
+LANG_PICK = {
+    "prompt": (
+        "🌐 <b>NMED HOME LAB</b>\n\n"
+        "Tilni tanlang / Выберите язык / Choose language:"
+    ),
+    "confirmed": {
+        "uz": "✅ Til o'zbek tiliga o'rnatildi!",
+        "ru": "✅ Язык установлен: русский!",
+        "en": "✅ Language set to English!",
+    },
+    "buttons": {
+        "uz": "🇺🇿 O'zbek",
+        "ru": "🇷🇺 Русский",
+        "en": "🇬🇧 English",
+    },
+}
+
+
+def get_language_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(LANG_PICK["buttons"]["uz"], callback_data="set_lang:uz")],
+        [InlineKeyboardButton(LANG_PICK["buttons"]["ru"], callback_data="set_lang:ru")],
+        [InlineKeyboardButton(LANG_PICK["buttons"]["en"], callback_data="set_lang:en")],
+    ])
+
+
+async def show_language_picker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Birinchi marta /start bosgan foydalanuvchiga til tanlash."""
+    tg_user = update.effective_user
+    chat_id = tg_user.id
+    if update.callback_query:
+        try:
+            await update.callback_query.answer()
+            await update.callback_query.edit_message_text(
+                LANG_PICK["prompt"],
+                parse_mode="html",
+                reply_markup=get_language_keyboard(),
+            )
+            return
+        except Exception:
+            pass
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=LANG_PICK["prompt"],
+        parse_mode="html",
+        reply_markup=get_language_keyboard(),
+    )
+
+
+async def set_lang_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Til tanlash callback — bazaga saqlaydi va asosiy menyuni ko'rsatadi."""
+    query = update.callback_query
+    await query.answer()
+    lang = query.data.split(":")[-1] if query.data else "uz"
+    lang = _clean_lang(lang)
+    tg_user = update.effective_user
+
+    @sync_to_async
+    def save_lang():
+        TelegramUser.objects.filter(user_id=tg_user.id).update(lang=lang, lang_chosen=True)
+
+    await save_lang()
+
+    try:
+        await query.edit_message_text(
+            LANG_PICK["confirmed"].get(lang, LANG_PICK["confirmed"]["uz"]),
+            parse_mode="html",
+        )
+    except Exception:
+        pass
+
+    await start(update, context)
+    return ConversationHandler.END
+
+
 def _clean_lang(lang: str) -> str:
     """Til kodini tozalaydi: 'uz-UZ' → 'uz'. Noto'g'ri bo'lsa 'uz' qaytaradi."""
     if not lang:
@@ -100,7 +204,7 @@ async def get_main_menu_keyboard(
     lang = _clean_lang(user_lang)
     t = BTN[lang]
 
-    order_url = webapp_url or _webapp_page_url("order", lang, user_id)
+    order_url = webapp_url or _webapp_page_url("home", lang, user_id)
 
     keyboard = [
         [
@@ -167,8 +271,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── 1. Callback orqali kelgan bo'lsa (masalan «🔙 Orqaga» tugmasi) ──────────
     if update.callback_query:
         try:
-            await update.callback_query.answer("Asosiy menyu")
-            await update.callback_query.delete_message()
+            data = update.callback_query.data or ""
+            if not data.startswith("set_lang:"):
+                await update.callback_query.answer("Asosiy menyu")
+                await update.callback_query.delete_message()
         except Exception:
             pass
 
@@ -176,6 +282,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_user_to_db(tg_user)
 
     # ── 3. Django modelidan foydalanuvchi ma'lumotlarini olish ───────────────────
+    user = None
+    lang_chosen = True
     try:
         user: TelegramUser = await sync_to_async(
             TelegramUser.objects.get
@@ -183,12 +291,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_lang = user.lang          # "uz" | "ru" | "en"
         user_role = user.role          # "user" | "courier" | "doctor" | "admin"
         is_admin  = user.is_admin
+        lang_chosen = user.lang_chosen
     except TelegramUser.DoesNotExist:
-        # Yangi foydalanuvchi — hozir save_user_to_db yozishi kerak edi,
-        # lekin har ehtimolga qarshi default qiymatlar
         user_lang = "uz"
         user_role = "user"
         is_admin  = False
+        lang_chosen = False
+
+    # ── 3b. Birinchi marta — til tanlash ─────────────────────────────────────────
+    if not lang_chosen and user_role == "user" and not is_admin:
+        await show_language_picker(update, context)
+        return ConversationHandler.END
 
     lang = _clean_lang(user_lang)
     
@@ -200,24 +313,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=remove_markup,
             parse_mode="html",
         )
-    user_id = user.user_id if user else None
+    user_id = user.user_id if user else tg_user.id
     # ── 5. Rol bo'yicha yo'naltirish ─────────────────────────────────────────────
-    #  Kuryer va shifokorlar uchun mos panel (callback_data orqali ochiladi)
     if user_role == "courier":
-        webapp_url = f"{str(WEB_APP_URL)}api/courier/?lang={lang}",
-        print(f"Courier {tg_user.id} uchun panel URL: {webapp_url}")
-        # WebApp URL-ga til parametrini qo'shamiz
-        connector = "&" if "?" in webapp_url else "?"
-        full_url = f"{webapp_url}{connector}lang={lang}"
-        if user_id:
-            full_url += f"&tg_id={user_id}"
+        full_url = f"{WEB_APP_URL.rstrip('/')}/api/courier/?lang={lang}&tg_id={user_id}"
 
         kb = InlineKeyboardMarkup([ [
             InlineKeyboardButton(
                 "🚗 Kuryer paneli" if lang == "uz" else
                 "🚗 Панель курьера" if lang == "ru" else
                 "🚗 Courier panel",
-                web_app=WebAppInfo(url=str(f"https://methods-slight-thumbnails-nationally.trycloudflare.com/api/courier/?lang=uz&tg_id={user_id}")),
+                web_app=WebAppInfo(url=full_url),
             )
         ]])
         await context.bot.send_message(
@@ -233,18 +339,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     if user_role == "doctor":
-        #     # WebApp URL-ga til parametrini qo'shamiz
-        # connector = "&" if "?" in webapp_url else "?"
-        # full_url = f"{webapp_url}{connector}lang={lang}"
-        # if user_id:
-        #     full_url += f"&tg_id={user_id}"
+        full_url = f"{WEB_APP_URL.rstrip('/')}/api/doctor/panel/?lang={lang}&tg_id={user_id}"
 
         kb = InlineKeyboardMarkup([[
             InlineKeyboardButton(
                 "👨‍⚕️ Shifokor paneli" if lang == "uz" else
                 "👨‍⚕️ Панель врача" if lang == "ru" else
                 "👨‍⚕️ Doctor panel",
-                web_app=WebAppInfo(url=str(f"https://methods-slight-thumbnails-nationally.trycloudflare.com/api/doctor/panel/?lang=uz&tg_id={user_id}")),
+                web_app=WebAppInfo(url=full_url),
             )
         ]])
         await context.bot.send_message(
@@ -314,7 +416,12 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         kb = InlineKeyboardMarkup([[
             InlineKeyboardButton("📱 WebAppni ochish", web_app=WebAppInfo(url=url))
         ]])
-        await query.message.reply_text("Bo'limni WebAppda oching 👇", reply_markup=kb)
+        OPEN_WEBAPP = {
+            "uz": "Bo'limni WebAppda oching 👇",
+            "ru": "Откройте раздел в WebApp 👇",
+            "en": "Open the section in WebApp 👇",
+        }
+        await query.message.reply_text(OPEN_WEBAPP.get(lang, OPEN_WEBAPP["uz"]), reply_markup=kb)
         return
 
     elif data == "contact_us" or data == "appeal":

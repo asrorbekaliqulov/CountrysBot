@@ -4,14 +4,14 @@
   if (tg) {
     tg.ready();
     tg.expand();
-    if (tg.setHeaderColor) tg.setHeaderColor('#0c1a33');
-    if (tg.setBackgroundColor) tg.setBackgroundColor('#0c1a33');
+    if (tg.setHeaderColor) tg.setHeaderColor('#0a1128');
+    if (tg.setBackgroundColor) tg.setBackgroundColor('#0a1128');
   }
 
   const params = new URLSearchParams(location.search);
   const initialPage = params.get('page') || 'home';
-  let currentLang = (params.get('lang') || 'uz').split('-')[0];
-  if (!['uz', 'ru', 'en'].includes(currentLang)) currentLang = 'uz';
+  let currentLang = (params.get('lang') || '').split('-')[0];
+  if (!['uz', 'ru', 'en'].includes(currentLang)) currentLang = '';
 
   let tgId = params.get('tg_id') || '';
   if (!tgId && tg?.initDataUnsafe?.user?.id) {
@@ -22,8 +22,9 @@
   let servicesData = [];
   let districtsData = [];
   let wizardStep = 1;
-  let wizardTotal = 8;
+  let wizardTotal = 9;
   let map, marker;
+  let lastOrderCode = '';
 
   const orderState = {
     tg_id: tgId,
@@ -42,57 +43,68 @@
     phone: '',
     latitude: 41.31108,
     longitude: 69.24056,
-    payment_method: 'tpay',
+    payment_method: null,
+    locationServed: null,
+    detectedAddress: '',
   };
 
-  const T = {
-    uz: {
-      home_title: 'Laboratoriya endi uyingizda',
-      order_btn: 'Tahlil buyurtma qilish',
-      my_results: 'Natijalarim',
-      order_status: 'Buyurtma holati',
-      profile: 'Profilim',
-      feedback: 'Fikr & taklif',
-      trust: 'Nega bizga ishonishadi?',
-      support: "Qo'llab-quvvatlash",
-      continue: 'Davom etish',
-      pay: "To'lash",
-      back: 'Orqaga',
-      step_of: (a, b) => `${a} / ${b}`,
-    },
-    ru: {
-      home_title: 'Лаборатория теперь у вас дома',
-      order_btn: 'Заказать анализ',
-      my_results: 'Мои результаты',
-      order_status: 'Статус заказа',
-      profile: 'Мой профиль',
-      feedback: 'Отзыв & предложение',
-      trust: 'Почему нам доверяют?',
-      support: 'Поддержка',
-      continue: 'Продолжить',
-      pay: 'Оплатить',
-      back: 'Назад',
-      step_of: (a, b) => `${a} / ${b}`,
-    },
-    en: {
-      home_title: 'Laboratory at your home',
-      order_btn: 'Order analysis',
-      my_results: 'My results',
-      order_status: 'Order status',
-      profile: 'My profile',
-      feedback: 'Feedback',
-      trust: 'Why trust us?',
-      support: 'Support',
-      continue: 'Continue',
-      pay: 'Pay',
-      back: 'Back',
-      step_of: (a, b) => `${a} / ${b}`,
-    },
-  };
+  const T = window.NMED_I18N || { uz: {}, ru: {}, en: {} };
 
   function tr(key) {
     const L = T[currentLang] || T.uz;
-    return L[key] || T.uz[key] || key;
+    const val = L[key];
+    if (typeof val === 'function') return val;
+    return val || T.uz[key] || key;
+  }
+
+  function serviceName(s) {
+    if (!s) return '—';
+    if (currentLang === 'ru') return s.name_ru || s.name_uz || s.name || '—';
+    if (currentLang === 'en') return s.name_en || s.name_uz || s.name || '—';
+    return s.name_uz || s.name || '—';
+  }
+
+  function applyI18n() {
+    document.documentElement.lang = currentLang || 'uz';
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      const key = el.dataset.i18n;
+      const val = tr(key);
+      if (val && typeof val === 'string') el.textContent = val;
+    });
+    document.querySelectorAll('[data-i18n-ph]').forEach((el) => {
+      const val = tr(el.dataset.i18nPh);
+      if (val && typeof val === 'string') el.placeholder = val;
+    });
+    const backBtn = document.getElementById('btnBack');
+    if (backBtn) backBtn.setAttribute('aria-label', tr('back'));
+  }
+
+  async function initLang() {
+    const urlLang = params.get('lang');
+    if (urlLang && ['uz', 'ru', 'en'].includes(urlLang.split('-')[0])) {
+      currentLang = urlLang.split('-')[0];
+      return;
+    }
+    if (tgId) {
+      try {
+        const p = await api('/api/webapp/profile/');
+        if (p.lang && ['uz', 'ru', 'en'].includes(p.lang)) {
+          currentLang = p.lang;
+          return;
+        }
+      } catch (e) {
+        console.warn('Profile lang', e);
+      }
+    }
+    const tgLang = tg?.initDataUnsafe?.user?.language_code;
+    if (tgLang) {
+      const code = tgLang.split('-')[0];
+      if (['uz', 'ru', 'en'].includes(code)) {
+        currentLang = code;
+        return;
+      }
+    }
+    currentLang = 'uz';
   }
 
   async function api(url, opts = {}) {
@@ -111,6 +123,8 @@
     if (el) el.classList.add('active');
     const backBtn = document.getElementById('btnBack');
     if (backBtn) backBtn.classList.toggle('visible', name !== 'home');
+    const header = document.querySelector('.app-header');
+    if (header) header.classList.toggle('hidden', name === 'home');
     if (name === 'orders') loadOrders();
     if (name === 'results') loadResults();
     if (name === 'profile') loadProfile();
@@ -141,18 +155,18 @@
 
   /* ── HOME ── */
   function initHome() {
-    document.getElementById('heroTitle').textContent = tr('home_title');
-    document.getElementById('btnOrderMain').textContent = '🧪 ' + tr('order_btn');
-    document.querySelectorAll('[data-menu]').forEach((el) => {
-      const k = el.dataset.menu;
-      if (k && T.uz[k]) el.querySelector('.mi-label').textContent = tr(k);
-    });
+    applyI18n();
   }
 
   /* ── WIZARD ── */
   function startWizard() {
     wizardStep = 1;
+    orderState.payment_method = null;
     orderState.tg_id = tgId;
+    document.getElementById('methodTpay')?.classList.remove('selected');
+    document.getElementById('methodAdmin')?.classList.remove('selected');
+    document.getElementById('adminPayBlock')?.classList.add('hidden');
+    document.getElementById('screenshotError')?.classList.add('hidden');
     showScreen('wizard');
     fetchServices();
     fetchDistricts();
@@ -171,11 +185,30 @@
     if (bar) bar.style.width = pct + '%';
     const lbl = document.getElementById('wizardStepLabel');
     if (lbl) lbl.textContent = tr('step_of')(wizardStep, wizardTotal);
+    const dots = document.getElementById('wizardDots');
+    if (dots) {
+      dots.innerHTML = Array.from({ length: wizardTotal }, (_, i) => {
+        const n = i + 1;
+        let cls = '';
+        if (n < wizardStep) cls = 'done';
+        else if (n === wizardStep) cls = 'active';
+        return `<span class="${cls}"></span>`;
+      }).join('');
+    }
     const btn = document.getElementById('wizardNextBtn');
     if (btn) {
-      btn.textContent = wizardStep === wizardTotal ? '🔒 ' + tr('pay') : tr('continue') + ' →';
-      btn.classList.toggle('success', wizardStep === wizardTotal);
+      btn.classList.remove('btn-pay');
+      if (wizardStep === wizardTotal) {
+        btn.textContent =
+          orderState.payment_method === 'tpay'
+            ? '🔒 ' + tr('pay')
+            : '🔒 ' + tr('confirm_order');
+        btn.classList.add('btn-pay');
+      } else {
+        btn.textContent = tr('continue') + ' →';
+      }
     }
+    applyI18n();
   }
 
   function wizardNext() {
@@ -198,50 +231,64 @@
 
   function validateWizard() {
     if (wizardStep === 1 && !orderState.service) {
-      alert('Xizmat turini tanlang');
+      alert(tr('alert_select_service'));
       return false;
     }
     if (wizardStep === 2 && !orderState.patient_type) {
-      alert('Bemor turini tanlang');
+      alert(tr('alert_select_patient'));
       return false;
     }
     if (wizardStep === 3) {
       orderState.patient_name = document.getElementById('patientName')?.value.trim() || '';
       orderState.patient_age = document.getElementById('patientAge')?.value || '';
       if (!orderState.patient_name || !orderState.patient_age || !orderState.patient_gender) {
-        alert("Ma'lumotlarni to'liq kiriting");
+        alert(tr('alert_fill_data'));
         return false;
       }
     }
     if (wizardStep === 4 && orderState.patient_type === 'child') {
       if (!orderState.child_timing || orderState.uses_diaper === null) {
-        alert('Bola parametrlarini to\'liq kiriting');
+        alert(tr('alert_child_params'));
         return false;
       }
     }
     if (wizardStep === 6 && !orderState.pickup_slot) {
-      alert('Vaqtni tanlang');
+      alert(tr('alert_select_time'));
       return false;
     }
     if (wizardStep === 7) {
-      orderState.district = document.getElementById('districtSelect')?.value;
-      orderState.address_note = document.getElementById('addressNote')?.value.trim() || '';
-      const phoneRaw = (document.getElementById('phoneInput')?.value || '').replace(/\D/g, '');
-      if (phoneRaw.length !== 9) {
-        document.getElementById('phoneError')?.classList.remove('hidden');
+      if (orderState.locationServed === null) {
+        alert(tr('alert_send_location'));
         return false;
       }
-      document.getElementById('phoneError')?.classList.add('hidden');
+      const served = orderState.locationServed === true;
+      const phoneEl = served ? document.getElementById('phoneInput') : document.getElementById('phoneInputExtra');
+      const phoneErr = served ? document.getElementById('phoneError') : document.getElementById('phoneErrorExtra');
+      const phoneRaw = (phoneEl?.value || '').replace(/\D/g, '');
+      if (phoneRaw.length !== 9) {
+        phoneErr?.classList.remove('hidden');
+        return false;
+      }
+      phoneErr?.classList.add('hidden');
       orderState.phone = '+998' + phoneRaw;
+      orderState.address_note = served
+        ? document.getElementById('addressNote')?.value.trim() || ''
+        : document.getElementById('addressNoteExtra')?.value.trim() || '';
+      if (orderState.detectedAddress && !orderState.address_note) {
+        orderState.address_note = orderState.detectedAddress;
+      }
       const dst = districtsData.find((d) => String(d.id) === String(orderState.district));
       if (!orderState.district || !isDistrictServed(dst)) {
-        alert('Tumanni tanlang yoki xizmat mavjud emas');
+        alert(tr('alert_select_district'));
         return false;
       }
     }
     if (wizardStep === 8) {
+      /* xulosa — faqat ko'rish */
+    }
+    if (wizardStep === 9) {
       if (!orderState.payment_method) {
-        alert("To'lov turini tanlang");
+        alert(tr('alert_select_pay'));
         return false;
       }
       if (orderState.payment_method === 'admin') {
@@ -258,27 +305,36 @@
   async function fetchServices() {
     const list = document.getElementById('servicesList');
     if (!list) return;
-    list.innerHTML = '<div class="empty-state">Yuklanmoqda...</div>';
+    list.innerHTML = '<div class="empty-state">' + tr('loading') + '</div>';
     try {
       const data = await api('/api/services/');
       servicesData = Array.isArray(data) ? data : data.results || [];
       list.innerHTML = servicesData
         .filter((s) => s.is_active !== false)
-        .map(
-          (s) => `
+        .map((s, idx) => {
+          const icCls = ['ic-green', 'ic-purple', 'ic-blue', 'ic-amber'][idx % 4];
+          const iconHtml = s.icon_url
+            ? `<img src="${s.icon_url}" alt="">`
+            : `<span>🧪</span>`;
+          const subtitle = s.description
+            ? `<div class="srv-subtitle">${s.description}</div>`
+            : '';
+          return `
         <div class="card-white" id="srv_${s.id}" onclick="window.NMED.selectService(${s.id})">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <div style="font-weight:700">🧪 ${s.name_uz || s.name}</div>
-              <div class="price">${Number(s.price).toLocaleString()} so'm</div>
+          <div class="srv-row">
+            <div class="srv-icon-wrap ${icCls}">${iconHtml}</div>
+            <div class="srv-info">
+              <div class="srv-name">${serviceName(s)}</div>
+              ${subtitle}
+              <div class="srv-price">${Number(s.price).toLocaleString()} ${tr('currency')}</div>
             </div>
-            <span style="color:#94a3b8">›</span>
+            <span class="srv-chevron">›</span>
           </div>
-        </div>`
-        )
+        </div>`;
+        })
         .join('');
     } catch (e) {
-      list.innerHTML = '<div class="empty-state">Xizmatlar yuklanmadi</div>';
+      list.innerHTML = '<div class="empty-state">' + tr('services_fail') + '</div>';
     }
   }
 
@@ -289,7 +345,7 @@
       const sel = document.getElementById('districtSelect');
       if (sel) {
         sel.innerHTML =
-          '<option value="">— Tuman tanlang —</option>' +
+          '<option value="">' + tr('select_district') + '</option>' +
           districtsData.map((d) => `<option value="${d.id}">${d.name}</option>`).join('');
       }
     } catch (e) {
@@ -321,15 +377,15 @@
     const grid = document.getElementById('childTimingsGrid');
     if (!grid) return;
     const items = [
-      { id: 'morning', t: '🌅 Ertalab' },
-      { id: 'day', t: '☀️ Kunduzi' },
-      { id: 'evening', t: '🌙 Kechki' },
-      { id: 'irregular', t: '🔄 Har xil' },
+      { id: 'morning', t: tr('ct_morning') },
+      { id: 'day', t: tr('ct_day') },
+      { id: 'evening', t: tr('ct_evening') },
+      { id: 'irregular', t: tr('ct_irregular') },
     ];
     grid.innerHTML = items
       .map(
         (x) =>
-          `<button type="button" class="pill-btn" id="ct_${x.id}" onclick="window.NMED.selectChildTiming('${x.id}')">${x.t}</button>`
+          `<button type="button" class="choice-block" id="ct_${x.id}" onclick="window.NMED.selectChildTiming('${x.id}')">${x.t}</button>`
       )
       .join('');
   }
@@ -350,19 +406,11 @@
   function renderComplaints(type) {
     const box = document.getElementById('complaintsBox');
     if (!box) return;
-    const list = [
-      'Ich qotishi',
-      'Ich ketishi',
-      'Qorin dam',
-      "Qorin og'rig'i",
-      "Ko'ngil aynishi",
-      'Allergiya',
-      'Parazit gumoni',
-    ];
+    const list = tr('complaints') || [];
     box.innerHTML = list
       .map(
         (c) => `
-      <label style="display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:8px;cursor:pointer">
+      <label class="choice-card">
         <input type="checkbox" value="${c}" onchange="window.NMED.toggleComplaint(this)"/>
         <span>${type === 'child' ? '👶' : '🧑'} ${c}</span>
       </label>`
@@ -379,24 +427,21 @@
   function renderSlots(type) {
     const box = document.getElementById('slotsBox');
     if (!box) return;
-    let slots = [];
-    if (type === 'adult') slots = ['📞 Operator bilan kelishiladi'];
-    else if (orderState.child_timing === 'morning') slots = ['🌅 07:00 — 10:00'];
-    else if (orderState.child_timing === 'day') slots = ['☀️ 12:00 — 15:00'];
-    else if (orderState.child_timing === 'evening') slots = ['🌙 18:00 — 20:00'];
-    else slots = ['📞 Operator bilan kelishiladi'];
-    box.innerHTML = slots
-      .map((s, i) => {
-        const sid = 'slot_' + i;
-        const esc = s.replace(/'/g, "\\'");
-        return `<div class="card-white" id="${sid}" onclick="window.NMED.selectSlot('${esc}', document.getElementById('${sid}'))">${s}</div>`;
-      })
-      .join('');
+    const slotLabel = '18:00 — 22:00';
+    const slotValue = '18:00 — 22:00';
+    box.innerHTML = `
+      <div class="slot-card" id="slot_evening" onclick="window.NMED.selectSlot('${slotValue}', document.getElementById('slot_evening'))">
+        <div>
+          <div class="slot-time">🌆 ${slotLabel}</div>
+          <div class="slot-hint">${tr('slot_hint')}</div>
+        </div>
+      </div>`;
+    orderState.pickup_slot = '';
   }
 
   function selectSlot(s, el) {
     orderState.pickup_slot = s;
-    document.querySelectorAll('[id^="slot_"]').forEach((n) => n.classList.remove('selected'));
+    document.querySelectorAll('.slot-card').forEach((n) => n.classList.remove('selected'));
     if (el) el.classList.add('selected');
   }
 
@@ -405,29 +450,27 @@
     document.getElementById('methodTpay')?.classList.toggle('selected', m === 'tpay');
     document.getElementById('methodAdmin')?.classList.toggle('selected', m === 'admin');
     document.getElementById('adminPayBlock')?.classList.toggle('hidden', m !== 'admin');
+    if (wizardStep === wizardTotal) updateWizardUI();
   }
 
   function fillSummary() {
     const srv = servicesData.find((s) => s.id == orderState.service);
-    const dst = districtsData.find((d) => String(d.id) === String(orderState.district));
     const sP = srv ? parseFloat(srv.price) : 0;
-    const dP = dst ? parseFloat(dst.delivery_price) : 0;
     const set = (id, t) => {
       const el = document.getElementById(id);
       if (el) el.textContent = t;
     };
-    set('summaryService', srv?.name_uz || '—');
-    set('summaryPatient', `${orderState.patient_name}, ${orderState.patient_age} yosh`);
+    set('summaryService', serviceName(srv));
+    set('summaryPatient', `${orderState.patient_name}, ${orderState.patient_age} ${tr('years')}`);
     set('summaryTime', orderState.pickup_slot || '—');
-    set('summaryDelivery', `${dP.toLocaleString()} so'm`);
-    set('summaryTotal', `${(sP + dP).toLocaleString()} so'm`);
+    set('summaryDelivery', tr('delivery_free'));
+    set('summaryTotal', `${sP.toLocaleString()} ${tr('currency')}`);
   }
 
   function isDistrictServed(d) {
     if (!d) return false;
     if (d.is_active === false || d.is_active === 'false' || d.is_active === 0) return false;
-    const p = Number(d.delivery_price);
-    return !isNaN(p) && p >= 0;
+    return true;
   }
 
   function initMap() {
@@ -443,19 +486,166 @@
     });
   }
 
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const toRad = (x) => (x * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  function setLocSpinner(on) {
+    document.getElementById('locSpinner')?.classList.toggle('hidden', !on);
+  }
+
+  function showServedBlock(district, humanAddress) {
+    orderState.locationServed = true;
+    orderState.district = String(district.id);
+    document.getElementById('districtSelect').value = district.id;
+    document.getElementById('locServedBlock')?.classList.remove('hidden');
+    document.getElementById('locUnservedBlock')?.classList.add('hidden');
+    const addr = document.getElementById('detectedAddressText');
+    const fee = document.getElementById('deliveryFeeText');
+    if (addr) addr.textContent = humanAddress || district.name;
+    if (fee) fee.textContent = `${tr('delivery_label')} ${tr('delivery_free')}`;
+    orderState.detectedAddress = humanAddress || district.name;
+  }
+
+  function showUnservedBlock(humanAddress) {
+    orderState.locationServed = false;
+    orderState.district = null;
+    document.getElementById('districtSelect').value = '';
+    document.getElementById('locServedBlock')?.classList.add('hidden');
+    document.getElementById('locUnservedBlock')?.classList.remove('hidden');
+    const t = document.getElementById('unservedAddressText');
+    if (t) t.textContent = humanAddress || tr('unserved_hint');
+    renderUnservedDistricts();
+  }
+
+  function renderUnservedDistricts() {
+    const box = document.getElementById('unservedDistrictList');
+    if (!box) return;
+    const served = districtsData.filter((d) => isDistrictServed(d));
+    if (!served.length) {
+      box.innerHTML = '<div class="empty-state">' + tr('no_districts') + '</div>';
+      return;
+    }
+    box.innerHTML = served
+      .map(
+        (d) => `
+      <button type="button" class="district-pick ${orderState.district == d.id ? 'selected' : ''}"
+        onclick="window.NMED.selectUnservedDistrict(${d.id})">
+        <span>🏘️ ${d.name}</span>
+        <span class="district-pick-meta">${tr('delivery_free')}</span>
+      </button>`
+      )
+      .join('');
+  }
+
+  function selectUnservedDistrict(id) {
+    const d = districtsData.find((x) => x.id == id);
+    if (!d) return;
+    orderState.district = String(id);
+    document.getElementById('districtSelect').value = id;
+    if (d.latitude && d.longitude && map) {
+      map.setView([parseFloat(d.latitude), parseFloat(d.longitude)], 13);
+      marker.setLatLng([parseFloat(d.latitude), parseFloat(d.longitude)]);
+      orderState.latitude = parseFloat(d.latitude);
+      orderState.longitude = parseFloat(d.longitude);
+    }
+    renderUnservedDistricts();
+  }
+
+  async function onLocOk(pos) {
+    setLocSpinner(false);
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    orderState.latitude = lat;
+    orderState.longitude = lng;
+    if (map) {
+      map.setView([lat, lng], 14);
+      marker.setLatLng([lat, lng]);
+      setTimeout(() => map.invalidateSize(), 200);
+    }
+
+    if (!districtsData.length) {
+      alert(tr('alert_districts_fail'));
+      return;
+    }
+
+    let humanAddress = null;
+    try {
+      const geo = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=16&addressdetails=1`,
+        { headers: { 'Accept-Language': 'uz,ru;q=0.8' } }
+      );
+      const geoData = await geo.json();
+      if (geoData?.address) {
+        const a = geoData.address;
+        const parts = [
+          a.road || a.pedestrian,
+          a.suburb || a.neighbourhood || a.quarter,
+          a.city_district,
+          a.city || a.town,
+        ].filter(Boolean);
+        humanAddress = parts.join(', ') || geoData.display_name?.split(',').slice(0, 3).join(', ');
+      }
+    } catch (e) {
+      console.warn('reverse geocode', e);
+    }
+
+    const ranked = [];
+    districtsData.forEach((d) => {
+      if (d.latitude == null || d.longitude == null) return;
+      ranked.push({ d, dist: haversine(lat, lng, parseFloat(d.latitude), parseFloat(d.longitude)) });
+    });
+    ranked.sort((a, b) => a.dist - b.dist);
+    const detected = ranked[0];
+    if (!detected) {
+      showUnservedBlock(humanAddress);
+      return;
+    }
+
+    if (detected.dist > 35) {
+      document.getElementById('locResult').innerHTML =
+        '<div class="info-card warn"><div class="info-card-title">' + tr('out_of_area') + '</div><div class="info-card-body">' + tr('out_of_area_body') + '</div></div>';
+      showUnservedBlock(humanAddress);
+      return;
+    }
+
+    const best = detected.d;
+    if (isDistrictServed(best)) {
+      document.getElementById('locResult').innerHTML = '';
+      showServedBlock(best, humanAddress || best.name);
+    } else {
+      document.getElementById('locResult').innerHTML =
+        '<div class="info-card warn"><div class="info-card-body">' + tr('no_service_here') + '</div></div>';
+      showUnservedBlock(humanAddress || best.name);
+    }
+  }
+
+  function onLocErr() {
+    setLocSpinner(false);
+    document.getElementById('locResult').innerHTML =
+      '<div class="info-card warn"><div class="info-card-body">' + tr('gps_error') + '</div></div>';
+    showUnservedBlock(null);
+  }
+
   async function requestLocation() {
-    if (!navigator.geolocation) return alert('Joylashuv qo\'llab-quvvatlanmaydi');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        orderState.latitude = pos.coords.latitude;
-        orderState.longitude = pos.coords.longitude;
-        if (map) {
-          map.setView([orderState.latitude, orderState.longitude], 14);
-          marker.setLatLng([orderState.latitude, orderState.longitude]);
-        }
-      },
-      () => alert('Joylashuv ruxsati kerak')
-    );
+    if (!navigator.geolocation) {
+      alert(tr('alert_geo_unsupported'));
+      showUnservedBlock(null);
+      return;
+    }
+    setLocSpinner(true);
+    navigator.geolocation.getCurrentPosition(onLocOk, onLocErr, {
+      enableHighAccuracy: true,
+      timeout: 25000,
+      maximumAge: 0,
+    });
   }
 
   async function submitOrder() {
@@ -484,50 +674,70 @@
       const res = await fetch('/tspay/orders/', { method: 'POST', body: fd });
       const data = await res.json();
       if (!data.success) {
-        alert(data.detail || 'Xatolik');
+        alert(data.detail || tr('error'));
         btn.disabled = false;
-        btn.textContent = tr('pay');
+        updateWizardUI();
         return;
       }
       if (orderState.payment_method === 'admin') {
-        showSuccess('Buyurtmangiz qabul qilindi!');
+        showOrderSuccess(data.order_code);
         return;
       }
       if (data.payment_url) {
         sessionStorage.setItem('tspay_cheque_id', data.cheque_id);
         sessionStorage.setItem('tspay_order_id', String(data.order_id));
-        location.href = data.payment_url;
+        sessionStorage.setItem('tspay_order_code', data.order_code || '');
+        if (tg?.openLink) tg.openLink(data.payment_url);
+        else window.location.href = data.payment_url;
         return;
       }
     } catch (e) {
-      alert('Server xatosi: ' + e.message);
+      alert(tr('error') + ': ' + e.message);
     }
     btn.disabled = false;
-    btn.textContent = tr('pay');
+    updateWizardUI();
   }
 
-  function showSuccess(msg) {
+  function showOrderSuccess(orderCode, subtitle) {
+    lastOrderCode = orderCode || '';
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('uz-UZ');
+    const timeStr = now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+    const code = orderCode || '—';
     const body = document.getElementById('wizardBody');
     body.innerHTML = `
-      <div class="success-screen">
-        <div class="check">✅</div>
-        <h2>Muvaffaqiyatli!</h2>
-        <p>${msg}</p>
-        <p style="font-size:13px;color:#64748b">Buyurtma: <b>NMED-${sessionStorage.getItem('tspay_order_id') || '—'}</b></p>
-        <button class="btn-primary" style="margin-top:24px;max-width:280px" onclick="window.NMED.goHome()">Yopish</button>
+      <div class="order-success-screen">
+        <div class="success-top-label">${tr('success_label')}</div>
+        <div class="success-card-premium">
+          <div class="success-check-ring">✓</div>
+          <h2>${subtitle || tr('success_accepted')}</h2>
+          <ul class="success-steps-list">
+            <li><span class="ss-ic">🧫</span><span>${tr('success_step1')}</span></li>
+            <li><span class="ss-ic">👤</span><span>${tr('success_step2')}</span></li>
+            <li><span class="ss-ic">🔬</span><span>${tr('success_step3')}</span></li>
+            <li><span class="ss-ic">📄</span><span>${tr('success_step4')}</span></li>
+          </ul>
+          <div class="success-order-box">
+            <div class="success-order-label">${tr('order_number')}</div>
+            <div class="success-order-id">#${code}</div>
+            <div class="success-order-date">${dateStr} · ${timeStr}</div>
+          </div>
+        </div>
+        <button type="button" class="btn-primary success-close-btn" onclick="window.NMED.goHome()">${tr('close')}</button>
       </div>`;
     document.querySelector('.wizard-footer')?.classList.add('hidden');
+    showScreen('wizard');
   }
 
   /* ── ORDERS ── */
   async function loadOrders() {
     const el = document.getElementById('ordersList');
     if (!el) return;
-    el.innerHTML = '<div class="empty-state">Yuklanmoqda...</div>';
+    el.innerHTML = '<div class="empty-state">' + tr('loading') + '</div>';
     try {
       const orders = await api('/api/webapp/orders/');
       if (!orders.length) {
-        el.innerHTML = '<div class="empty-state"><div class="emoji">📭</div><p>Hozircha buyurtmalar yo\'q</p></div>';
+        el.innerHTML = '<div class="empty-state"><div class="emoji">📭</div><p>' + tr('no_orders') + '</p></div>';
         return;
       }
       el.innerHTML = orders
@@ -538,32 +748,24 @@
           <div class="title">${o.service_name}</div>
           <div style="font-size:13px;color:#64748b">${o.created_at}</div>
           <span class="status-badge status-${o.status}">${statusText(o.status)}</span>
-          <div style="margin-top:8px;font-weight:700">${Number(o.total_price).toLocaleString()} so'm</div>
+          <div style="margin-top:8px;font-weight:700">${Number(o.total_price).toLocaleString()} ${tr('currency')}</div>
         </div>`
         )
         .join('');
     } catch (e) {
-      el.innerHTML = '<div class="empty-state">Xatolik</div>';
+      el.innerHTML = '<div class="empty-state">' + tr('error') + '</div>';
     }
   }
 
   function statusText(s) {
-    const m = {
-      pending: '⏳ Kutilmoqda',
-      paid: "💳 To'langan",
-      delivering: "🚚 Yo'lda",
-      done: '✅ Yetkazildi',
-      result_pending: '🔬 Laboratoriyada',
-      result_sent: '📊 Natija tayyor',
-      canceled: '❌ Bekor',
-    };
+    const m = tr('status') || {};
     return m[s] || s;
   }
 
   async function openOrder(id) {
     showScreen('order-detail');
     const el = document.getElementById('orderDetailContent');
-    el.innerHTML = '<div class="empty-state">Yuklanmoqda...</div>';
+    el.innerHTML = '<div class="empty-state">' + tr('loading') + '</div>';
     try {
       const o = await api(`/api/webapp/orders/${id}/`);
       let tlHtml = (o.timeline || [])
@@ -580,20 +782,20 @@
         <p style="color:#64748b;font-size:13px;margin:0 0 16px">${o.created_at}</p>
         <div class="order-card" style="cursor:default">
           <div><b>${o.service_name}</b></div>
-          <div style="font-size:13px;margin-top:8px">👤 ${o.patient_name || '—'}, ${o.patient_age || '—'} yosh</div>
+          <div style="font-size:13px;margin-top:8px">👤 ${o.patient_name || '—'}, ${o.patient_age || '—'} ${tr('years')}</div>
           <div style="font-size:13px">📍 ${o.district_name || '—'}</div>
           <div style="font-size:13px">🕐 ${o.pickup_slot || '—'}</div>
-          <div style="font-weight:700;margin-top:12px">${Number(o.total_price).toLocaleString()} so'm</div>
+          <div style="font-weight:700;margin-top:12px">${Number(o.total_price).toLocaleString()} ${tr('currency')}</div>
         </div>
-        <h3 style="font-size:15px">Buyurtma holati</h3>
+        <h3 style="font-size:15px">${tr('order_status_title')}</h3>
         <div class="timeline">${tlHtml}</div>
         ${
           o.result_url
-            ? `<a href="${o.result_url}" target="_blank" class="btn-primary" style="display:block;text-align:center;text-decoration:none;margin-top:16px">📄 Natijani ko'rish</a>`
+            ? `<a href="${o.result_url}" target="_blank" class="btn-primary" style="display:block;text-align:center;text-decoration:none;margin-top:16px">${tr('view_result')}</a>`
             : ''
         }`;
     } catch (e) {
-      el.innerHTML = '<div class="empty-state">Topilmadi</div>';
+      el.innerHTML = '<div class="empty-state">' + tr('not_found') + '</div>';
     }
   }
 
@@ -601,11 +803,11 @@
   async function loadResults() {
     const el = document.getElementById('resultsList');
     if (!el) return;
-    el.innerHTML = '<div class="empty-state">Yuklanmoqda...</div>';
+    el.innerHTML = '<div class="empty-state">' + tr('loading') + '</div>';
     try {
       const items = await api('/api/webapp/results/');
       if (!items.length) {
-        el.innerHTML = '<div class="empty-state"><div class="emoji">📭</div><p>Natijalar hali mavjud emas</p></div>';
+        el.innerHTML = '<div class="empty-state"><div class="emoji">📭</div><p>' + tr('no_results') + '</p></div>';
         return;
       }
       el.innerHTML = items
@@ -616,12 +818,12 @@
           <div class="title">${r.service_name}</div>
           <div style="font-size:13px;color:#64748b">📅 ${r.created_at}</div>
           ${r.doctor_conclusion ? `<p style="font-size:13px;margin-top:8px"><i>${r.doctor_conclusion}</i></p>` : ''}
-          <a href="${r.result_url}" target="_blank" class="btn-primary" style="display:block;text-align:center;text-decoration:none;margin-top:12px;font-size:14px;padding:12px">📄 Natijani yuklab olish</a>
+          <a href="${r.result_url}" target="_blank" class="btn-primary" style="display:block;text-align:center;text-decoration:none;margin-top:12px;font-size:14px;padding:12px">${tr('download_result')}</a>
         </div>`
         )
         .join('');
     } catch (e) {
-      el.innerHTML = '<div class="empty-state">Xatolik</div>';
+      el.innerHTML = '<div class="empty-state">' + tr('error') + '</div>';
     }
   }
 
@@ -639,33 +841,33 @@
           <div style="font-size:22px;font-weight:800;margin:4px 0">${p.patient_id}</div>
           <div style="font-size:15px">${p.first_name || '—'}</div>
           <div style="font-size:12px;opacity:.7;margin-top:8px">📅 ${p.date_joined}</div>
-          <div style="margin-top:16px">⭐️ ${p.bonus_points} bonus</div>
+          <div style="margin-top:16px">⭐️ ${p.bonus_points} ${tr('profile_bonus')}</div>
           <div class="bonus-bar">${bar}</div>
-          <div style="font-size:12px">Yana <b>${p.next_free_in}</b> ta buyurtmadan keyin bepul</div>
+          <div style="font-size:12px">${typeof tr('profile_free_after') === 'function' ? tr('profile_free_after')(p.next_free_in) : p.next_free_in}</div>
         </div>
         <div class="order-card" style="cursor:default">
-          <div>📦 Jami buyurtmalar: <b>${p.total_orders}</b></div>
-          <div style="margin-top:8px">✅ Yakunlangan: <b>${p.completed_orders}</b></div>
+          <div>📦 ${tr('profile_total')} <b>${p.total_orders}</b></div>
+          <div style="margin-top:8px">✅ ${tr('profile_completed')} <b>${p.completed_orders}</b></div>
         </div>`;
     } catch (e) {
-      el.innerHTML = '<div class="empty-state">Profil yuklanmadi</div>';
+      el.innerHTML = '<div class="empty-state">' + tr('profile_fail') + '</div>';
     }
   }
 
   async function submitAppeal() {
     const msg = document.getElementById('appealText')?.value?.trim();
-    if (!msg) return alert('Xabar yozing');
+    if (!msg) return alert(tr('alert_write_message'));
     try {
       await api('/api/webapp/appeal/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tg_id: tgId, message: msg }),
       });
-      alert('Rahmat! Murojaatingiz qabul qilindi.');
+      alert(tr('alert_thanks'));
       document.getElementById('appealText').value = '';
       goHome();
     } catch (e) {
-      alert('Xatolik');
+      alert(tr('error'));
     }
   }
 
@@ -719,44 +921,46 @@
     toggleComplaint,
     selectSlot,
     selectPayMethod,
+    selectUnservedDistrict,
     openOrder,
     goHome,
     startWizard,
   };
 
-  loadSettings().then(() => {
-    initHome();
-    orderState.tg_id = tgId;
-    if (initialPage === 'order') startWizard();
-    else if (initialPage !== 'home') showScreen(initialPage);
-    else showScreen('home');
+  initLang().then(() => {
+    applyI18n();
+    loadSettings().then(() => {
+      initHome();
+      orderState.tg_id = tgId;
+      if (initialPage === 'order') showScreen('home');
+      else if (initialPage !== 'home') showScreen(initialPage);
+      else showScreen('home');
 
-    if (wizardStep === 8) fillSummary();
-    checkTspayReturn();
+      if (wizardStep === 8) fillSummary();
+      checkTspayReturn();
+    });
   });
 
   async function checkTspayReturn() {
     const chequeId = sessionStorage.getItem('tspay_cheque_id');
     const orderId = sessionStorage.getItem('tspay_order_id');
+    const orderCode = sessionStorage.getItem('tspay_order_code');
     if (!chequeId || !orderId) return;
     sessionStorage.removeItem('tspay_cheque_id');
     sessionStorage.removeItem('tspay_order_id');
-    startWizard();
+    sessionStorage.removeItem('tspay_order_code');
+    showScreen('wizard');
+    const fallbackCode = orderCode || `NMED-${String(orderId).padStart(5, '0')}`;
     try {
-      const r = await fetch(`/tspay/orders/${orderId}/confirm_payment/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cheque_id: chequeId }),
-      });
+      const r = await fetch(`/tspay/orders/${orderId}/check_payment/?tg_id=${tgId || ''}`);
       const result = await r.json();
-      if (result.status === 'paid' || result.success) showSuccess("To'lov muvaffaqiyatli!");
-      else showSuccess("To'lov tekshirilmoqda. Tez orada bog'lanamiz.");
+      if (result.status === 'paid' || result.success) {
+        showOrderSuccess(fallbackCode);
+      } else {
+        showOrderSuccess(fallbackCode, tr('pay_checking'));
+      }
     } catch (e) {
-      showSuccess('Buyurtma qabul qilindi.');
+      showOrderSuccess(fallbackCode);
     }
-  }
-
-  if (wizardStep === 8) {
-    /* noop - filled on step enter */
   }
 })();

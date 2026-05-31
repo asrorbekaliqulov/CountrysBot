@@ -18,8 +18,25 @@ if DEBUG is not None:
 else:
     DEBUG = False
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "e855-2a05-45c2-6296-9900-8d20-c23-4618-f5c9.ngrok-free.app"]
-CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1", "https://localhost:8000", "https://e855-2a05-45c2-6296-9900-8d20-c23-4618-f5c9.ngrok-free.app"]
+_allowed = os.getenv("ALLOWED_HOSTS", "")
+ALLOWED_HOSTS = [h.strip() for h in _allowed.split(",") if h.strip()] or [
+    "127.0.0.1",
+    "localhost",
+    "n-medhomelab.uz",
+]
+for _host in ("n-medhomelab.uz", "www.n-medhomelab.uz"):
+    if _host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_host)
+
+_csrf = os.getenv("CSRF_TRUSTED_ORIGINS", "")
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf.split(",") if o.strip()] or [
+    "http://127.0.0.1",
+    "https://localhost:8000",
+    "https://n-medhomelab.uz",
+]
+for _origin in ("https://n-medhomelab.uz", "https://www.n-medhomelab.uz"):
+    if _origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_origin)
 
 INSTALLED_APPS = [*THIRD_PARTY_APPS, *DEFAULT_APPS, *PROJECT_APPS]
 
@@ -119,79 +136,12 @@ MEDIA_ROOT = str(BASE_DIR.joinpath("assets/media"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ALLOW_ALL_ORIGINS = True
-
 LOCALE_MIDDLEWARE_EXCLUDED_PATHS = ["/media/", "/static/"]
-
-"""
-MedBot Django Settings
-O'zbekiston tibbiy tahlil buyurtma tizimi
-"""
-import os
-from pathlib import Path
-from dotenv import load_dotenv
-
-load_dotenv()
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-
-# ─── DATABASE ─────────────────────────────────────────────────────────────────
-_db_url = os.environ.get("DATABASE_URL", "postgres://medbot:medbot@localhost:5432/medbot_db")
-
-# DATABASE_URL ni parse qilamiz
-import re
-# _match = re.match(
-#     r"postgres(?:ql)?://(?P<user>[^:]+):(?P<password>[^@]+)@(?P<host>[^:/]+)(?::(?P<port>\d+))?/(?P<name>.+)",
-#     _db_url
-# )
-# if _match:
-#     _d = _match.groupdict()
-#     DATABASES = {
-#         "default": {
-#             "ENGINE": "django.db.backends.postgresql",
-#             "NAME": _d["name"],
-#             "USER": _d["user"],
-#             "PASSWORD": _d["password"],
-#             "HOST": _d["host"],
-#             "PORT": _d.get("port") or "5432",
-#             "OPTIONS": {
-#                 "connect_timeout": 10,
-#             },
-#             "CONN_MAX_AGE": 60,
-#         }
-#     }
-# else:
-#     # Fallback
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         "NAME": "medbot_db",
-#         "USER": "medbot",
-#         "PASSWORD": "medbot",
-#         "HOST": "localhost",
-#         "PORT": "5432",
-#     }
-# }
-
-
-
-
-# ─── STATIC & MEDIA ───────────────────────────────────────────────────────────
-
-
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-
-
-
-# ─── REST FRAMEWORK ───────────────────────────────────────────────────────────
-
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
     "https://web.telegram.org",
-    "https://k.tspay.uz",
+    "https://api.tspay.uz",
 ]
 
 _webapp_url = os.environ.get("WEBAPP_URL", "https://yourdomain.com").rstrip("/")
@@ -215,6 +165,9 @@ WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://n-medhomelab.uz")
 TSPAY_MERCHANT_ID = os.environ.get("TSPAY_MERCHANT_ID")
 TSPAY_SECRET_KEY  = os.environ.get("TSPAY_SECRET_KEY")
 TSPAY_BASE_URL    = "https://api.tspay.uz"
+TSPAY_WEBHOOK_URL = os.environ.get(
+    "TSPAY_WEBHOOK_URL", "https://n-medhomelab.uz/tspay/webhook/"
+)
 TSPAY_WEBHOOK_SECRET = os.environ.get("TSPAY_WEBHOOK_SECRET")
 # ─── CELERY ───────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL       = os.environ.get("REDIS_URL", "redis://localhost:6379/0")

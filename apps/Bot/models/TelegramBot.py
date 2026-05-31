@@ -52,6 +52,7 @@ class TelegramUser(models.Model):
     is_admin    = models.BooleanField(default=False, verbose_name="Is Admin")
     is_active   = models.BooleanField(default=True, verbose_name="Is Active")
     lang        = models.CharField(max_length=5, default="uz", choices=LANG_CHOICES, verbose_name="Til")
+    lang_chosen = models.BooleanField(default=False, verbose_name="Til tanlangan")
     role        = models.CharField(max_length=20, default="user", choices=ROLE_CHOICES, verbose_name="Rol")
 
 
