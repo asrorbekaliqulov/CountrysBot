@@ -66,7 +66,7 @@ class District(models.Model):
         force=True bo'lsa qayta oladi.
         """
         if self.geo_fetched and not force:
-            return
+            return True
 
         try:
             from geopy.geocoders import Nominatim
@@ -86,11 +86,14 @@ class District(models.Model):
                 self.geo_fetched = True
                 self.save(update_fields=["latitude", "longitude", "geo_address", "geo_fetched"])
                 logger.info("Coordinates fetched: %s → %.4f, %.4f", self.name, self.latitude, self.longitude)
-            else:
-                logger.warning("Coordinates not found for: %s", self.name)
+                return True
+            logger.warning("Coordinates not found for: %s", self.name)
+            return False
 
         except Exception as e:
             logger.error("Geopy error for %s: %s", self.name, e)
+            return False
+        return False
 
     @property
     def coords(self):

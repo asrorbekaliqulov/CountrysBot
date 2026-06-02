@@ -1,3 +1,5 @@
+import json
+
 from rest_framework import serializers
 from apps.Bot.models.bot import Region, District, BotSetting
 from apps.Bot.models.TelegramBot import TelegramUser, Channel, Referral, Guide, Appeal
@@ -105,27 +107,107 @@ class PaymentSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['status', 'transaction_id']
 
+def _parse_bool(value):
+    if value is None or value == '':
+        return None
+    if isinstance(value, bool):
+        return value
+    s = str(value).strip().lower()
+    if s in ('true', '1', 'yes', 'ha'):
+        return True
+    if s in ('false', '0', 'no', "yo'q", 'yoq'):
+        return False
+    return None
+
+
+def flatten_serializer_errors(errors):
+    """DRF xatolarini foydalanuvchi uchun oddiy matnga aylantirish."""
+    if not errors:
+        return 'Ma\'lumot noto\'g\'ri'
+    if isinstance(errors, str):
+        return errors
+    if isinstance(errors, list):
+        return ' '.join(str(e) for e in errors)
+    parts = []
+    for key, val in errors.items():
+        if isinstance(val, (list, tuple)):
+            for item in val:
+                parts.append(f'{key}: {item}')
+        else:
+            parts.append(f'{key}: {val}')
+    return ' '.join(parts) if parts else 'Ma\'lumot noto\'g\'ri'
+
+
+def _parse_complaints(value):
+    if value is None or value == '':
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, list) else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return []
+
+
 class OrderCreateSerializer(serializers.ModelSerializer):
     payment_method = serializers.CharField(write_only=True)
     screenshot = serializers.ImageField(required=False, write_only=True)
     phone = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    complaints = serializers.JSONField(required=False, default=list)
+    uses_diaper = serializers.BooleanField(required=False, allow_null=True)
 
     class Meta:
         model = Order
-        fields = '__all__'
+        fields = [
+            'service', 'patient_type', 'patient_name', 'patient_age', 'patient_gender',
+            'child_timing', 'uses_diaper', 'complaints', 'custom_complaint',
+            'pickup_slot', 'district', 'address_note', 'latitude', 'longitude',
+            'payment_method', 'screenshot', 'phone',
+        ]
         read_only_fields = ['user', 'base_price', 'extra_fee', 'total_price', 'status', 'courier']
+        extra_kwargs = {
+            'child_timing': {'required': False, 'allow_null': True, 'allow_blank': True},
+            'custom_complaint': {'required': False, 'allow_blank': True},
+            'address_note': {'required': False, 'allow_blank': True},
+        }
+
+    def validate_complaints(self, value):
+        return _parse_complaints(value)
+
+    def validate_uses_diaper(self, value):
+        return _parse_bool(value)
+
+    def validate_child_timing(self, value):
+        if value in (None, ''):
+            return None
+        return value
 
     def validate(self, attrs):
         request = self.context.get('request')
-        payment_method = self.initial_data.get('payment_method')
+        raw = self.initial_data
+        payment_method = raw.get('payment_method')
         if payment_method == 'admin':
-            has_file = bool(self.initial_data.get('screenshot'))
-            if request and hasattr(request, 'FILES') and request.FILES.get('screenshot'):
+            has_file = False
+            if request and getattr(request, 'FILES', None) and request.FILES.get('screenshot'):
+                has_file = True
+                attrs['screenshot'] = request.FILES['screenshot']
+            elif attrs.get('screenshot'):
                 has_file = True
             if not has_file:
                 raise serializers.ValidationError({'screenshot': 'Admin to\'lovi uchun chek rasmi majburiy'})
         if payment_method not in ('admin', 'tpay'):
             raise serializers.ValidationError({'payment_method': 'To\'lov usulini tanlang'})
+        if attrs.get('patient_type') == 'child':
+            if not attrs.get('child_timing'):
+                raise serializers.ValidationError({'child_timing': 'Hojat vaqtini tanlang'})
+            if attrs.get('uses_diaper') is None:
+                raise serializers.ValidationError({'uses_diaper': 'Taglik ha/yo\'q ni tanlang'})
+        else:
+            attrs['child_timing'] = None
+            attrs['uses_diaper'] = None
         return attrs
 
     def create(self, validated_data):

@@ -22,6 +22,8 @@ urlpatterns = [
     # ── TSPay Webhook ─────────────────────────────────────────────────────────
     # POST /api/webhook/tspay/
     # settings.py da: TSPAY_WEBHOOK_URL = "https://domain.uz/api/webhook/tspay/"
+    # TSPay ba'zan slashsiz URL chaqiradi — ikkala variant ham kerak
+    path('webhook', tspay_webhook_view, name='tspay_webhook_noslash'),
     path('webhook/', tspay_webhook_view, name='tspay_webhook'),
 
 ]

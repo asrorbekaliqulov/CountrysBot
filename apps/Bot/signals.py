@@ -19,26 +19,24 @@ def track_user_role_before_save(sender, instance, **kwargs):
         instance._previous_role = None
 
 
+STAFF_ROLES = frozenset({'admin', 'doctor', 'courier'})
+
+
 @receiver(post_save, sender=TelegramUser)
 def notify_staff_on_role_change(sender, instance, created, **kwargs):
-    """
-    Yangi xodim qo'shilganda yoki roli o'zgarganda ishlovchi signal
-    """
-    # Agar roli 'client' (oddiy mijoz) bo'lsa, xabar yuborish shart emas
-    if instance.role == 'client':
+    """Faqat xodim rollari (admin/doctor/courier) uchun — oddiy user ga xabar yo'q."""
+    if instance.role not in STAFF_ROLES:
         return
 
-    # Roli o'zbekcha chiroyli ko'rinishi uchun lug'at (mapping)
     role_names = {
         'admin': '💻 Admin (Boshqaruvchi)',
         'doctor': '🩺 Shifokor (Doctor)',
-        'courier': '🚚 Kuryer / Tibbiy Xodim'
+        'courier': '🚚 Kuryer / Tibbiy Xodim',
     }
-    
+
     current_role_display = role_names.get(instance.role, instance.role)
     chat_id = instance.user_id
 
-    # 1-HOLAT: Yangi xodim bazaga qo'shilganda (Created = True)
     if created:
         message_text = (
             f"<b>Hurmatli {instance.first_name}!</b>\n\n"
@@ -216,39 +214,40 @@ def remember_old_status(sender, instance, **kwargs):
 @receiver(post_save, sender=Order)
 def notify_patient_on_status_change(sender, instance, created, **kwargs):
     """
-    Order saqlangandan KEYIN:
+    Order saqlangandan KEYIN (on_commit — HTTP javobni bloklamasdan):
     - Yangi buyurtma → 'pending' xabari
     - Status o'zgangan → yangi statusga mos xabar
-    - Status o'zgarmagan → hech narsa qilmaydi
     """
+    from django.db import transaction
+
+    order_id = instance.pk
     new_status = instance.status
     old_status = getattr(instance, '_old_status', None)
 
-    # Status o'zgarmagan bo'lsa — chiqib ketamiz
     if not created and old_status == new_status:
         return
 
-    patient_tg_id = get_patient_tg_id(instance)
-    if not patient_tg_id:
-        logger.debug(
-            "[Signal] Buyurtma #%s — bemor tg_id topilmadi, xabar yuborilmadi.",
-            instance.id
-        )
-        return
+    def _send_after_commit():
+        try:
+            order = Order.objects.select_related('service', 'user').get(pk=order_id)
+        except Order.DoesNotExist:
+            return
 
-    text = build_message(new_status, instance)
-    if not text:
-        logger.debug(
-            "[Signal] Buyurtma #%s — '%s' statusi uchun xabar shabloni yo'q.",
-            instance.id, new_status
-        )
-        return
+        patient_tg_id = get_patient_tg_id(order)
+        if not patient_tg_id:
+            return
 
-    success = send_telegram_message(patient_tg_id, text)
-    logger.info(
-        "[Signal] Buyurtma #%s | %s → %s | Telegram: %s",
-        instance.id,
-        old_status or "yangi",
-        new_status,
-        "✅ yuborildi" if success else "❌ xato",
-    )
+        text = build_message(order.status, order)
+        if not text:
+            return
+
+        success = send_telegram_message(patient_tg_id, text)
+        logger.info(
+            "[Signal] Buyurtma #%s | %s → %s | Telegram: %s",
+            order.id,
+            old_status or "yangi",
+            order.status,
+            "✅ yuborildi" if success else "❌ xato",
+        )
+
+    transaction.on_commit(_send_after_commit)

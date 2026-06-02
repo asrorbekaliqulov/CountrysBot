@@ -8,7 +8,7 @@ import os
 from asgiref.sync import sync_to_async
 
 
-WEB_APP_URL = os.getenv("WEB_APP_URL", "https://manor-estate-secretariat-strategy.trycloudflare.com/")
+WEB_APP_URL = os.getenv("WEB_APP_URL", "https://n-medhomelab.uz/")
 
 def _lang(context: ContextTypes.DEFAULT_TYPE, fallback: str = "uz") -> str:
     try:

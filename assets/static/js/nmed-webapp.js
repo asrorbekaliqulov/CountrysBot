@@ -4,8 +4,17 @@
   if (tg) {
     tg.ready();
     tg.expand();
+    if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+    if (tg.requestFullscreen) {
+      try {
+        tg.requestFullscreen();
+      } catch (e) {
+        /* eski Telegram versiyalari */
+      }
+    }
     if (tg.setHeaderColor) tg.setHeaderColor('#0a1128');
     if (tg.setBackgroundColor) tg.setBackgroundColor('#0a1128');
+    document.documentElement.classList.add('tg-webapp');
   }
 
   const params = new URLSearchParams(location.search);
@@ -25,6 +34,8 @@
   let wizardTotal = 9;
   let map, marker;
   let lastOrderCode = '';
+  let wizardSuccessMode = false;
+  let wizardBodyTemplate = '';
 
   const orderState = {
     tg_id: tgId,
@@ -117,22 +128,77 @@
     return r.text();
   }
 
+  function alertError(message) {
+    const msg = (message || tr('error')).trim();
+    const generic = tr('error');
+    if (!msg || msg === generic || msg === 'Error' || msg === 'Xatolik') {
+      alert(generic);
+      return;
+    }
+    if (msg.startsWith(generic + ':') || msg.startsWith('Error:')) {
+      alert(msg);
+      return;
+    }
+    alert(msg);
+  }
+
+  function formatApiError(data) {
+    if (!data) return tr('error');
+    if (typeof data === 'string') return data;
+    if (typeof data.detail === 'string' && data.detail.trim()) return data.detail.trim();
+    if (Array.isArray(data.detail)) return data.detail.map(String).join('\n');
+    if (typeof data.detail === 'object' && data.detail !== null) {
+      return Object.entries(data.detail)
+        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+        .join('\n');
+    }
+    if (data.errors && typeof data.errors === 'object') {
+      return Object.entries(data.errors)
+        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+        .join('\n');
+    }
+    if (data.screenshot) return String(Array.isArray(data.screenshot) ? data.screenshot[0] : data.screenshot);
+    return tr('error');
+  }
+
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function initIcons() {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ attrs: { 'stroke-width': 2 } });
+    }
+  }
+
   function showScreen(name) {
     document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
     const el = document.getElementById(`screen-${name}`);
     if (el) el.classList.add('active');
     const backBtn = document.getElementById('btnBack');
-    if (backBtn) backBtn.classList.toggle('visible', name !== 'home');
-    const header = document.querySelector('.app-header');
-    if (header) header.classList.toggle('hidden', name === 'home');
+    if (backBtn) backBtn.classList.toggle('visible', name !== 'home' && !wizardSuccessMode);
+    const header = document.getElementById('appHeader');
+    if (header) {
+      header.classList.toggle('hidden', name === 'home' || wizardSuccessMode);
+      header.classList.toggle('compact', name !== 'home' && !wizardSuccessMode);
+    }
     if (name === 'orders') loadOrders();
     if (name === 'results') loadResults();
     if (name === 'profile') loadProfile();
     if (name === 'order-detail') { /* filled by openOrder */ }
-    if (name === 'wizard') updateWizardUI();
+    if (name === 'wizard' && !wizardSuccessMode) updateWizardUI();
   }
 
   function goHome() {
+    wizardSuccessMode = false;
+    if (!document.querySelector('.wizard-step')) {
+      location.href = location.pathname + `?lang=${currentLang}${tgId ? '&tg_id=' + tgId : ''}`;
+      return;
+    }
     showScreen('home');
     history.replaceState(null, '', location.pathname + `?lang=${currentLang}${tgId ? '&tg_id=' + tgId : ''}`);
   }
@@ -156,10 +222,17 @@
   /* ── HOME ── */
   function initHome() {
     applyI18n();
+    initIcons();
   }
 
   /* ── WIZARD ── */
   function startWizard() {
+    wizardSuccessMode = false;
+    const body = document.getElementById('wizardBody');
+    if (body && wizardBodyTemplate && !document.querySelector('.wizard-step')) {
+      body.innerHTML = wizardBodyTemplate;
+      bindWizardEvents();
+    }
     wizardStep = 1;
     orderState.payment_method = null;
     orderState.tg_id = tgId;
@@ -167,6 +240,7 @@
     document.getElementById('methodAdmin')?.classList.remove('selected');
     document.getElementById('adminPayBlock')?.classList.add('hidden');
     document.getElementById('screenshotError')?.classList.add('hidden');
+    document.querySelector('.wizard-footer')?.classList.remove('hidden');
     showScreen('wizard');
     fetchServices();
     fetchDistricts();
@@ -209,6 +283,7 @@
       }
     }
     applyI18n();
+    initIcons();
   }
 
   function wizardNext() {
@@ -432,17 +507,19 @@
     box.innerHTML = `
       <div class="slot-card" id="slot_evening" onclick="window.NMED.selectSlot('${slotValue}', document.getElementById('slot_evening'))">
         <div>
-          <div class="slot-time">🌆 ${slotLabel}</div>
+          <div class="slot-time"><i data-lucide="moon" style="width:18px;height:18px;vertical-align:middle;margin-right:6px"></i>${slotLabel}</div>
           <div class="slot-hint">${tr('slot_hint')}</div>
         </div>
       </div>`;
     orderState.pickup_slot = '';
+    initIcons();
   }
 
   function selectSlot(s, el) {
     orderState.pickup_slot = s;
     document.querySelectorAll('.slot-card').forEach((n) => n.classList.remove('selected'));
     if (el) el.classList.add('selected');
+    initIcons();
   }
 
   function selectPayMethod(m) {
@@ -654,33 +731,63 @@
     fillSummary();
 
     const btn = document.getElementById('wizardNextBtn');
+    if (!btn) return;
     btn.disabled = true;
     btn.textContent = '⏳ ...';
 
     const fd = new FormData();
     const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
     if (csrf) fd.append('csrfmiddlewaretoken', csrf);
+    const skipKeys = new Set(['locationServed', 'detectedAddress']);
     for (const [k, v] of Object.entries(orderState)) {
-      if (v == null) continue;
-      if (k === 'complaints') fd.append(k, JSON.stringify(v));
-      else fd.append(k, v);
+      if (v == null || v === '' || skipKeys.has(k)) continue;
+      if (k === 'complaints') {
+        fd.append(k, JSON.stringify(v));
+      } else if (k === 'uses_diaper' || typeof v === 'boolean') {
+        fd.append(k, v ? 'true' : 'false');
+      } else {
+        fd.append(k, v);
+      }
     }
     if (orderState.payment_method === 'admin') {
       const fi = document.getElementById('paymentScreenshot');
-      if (fi?.files?.[0]) fd.append('screenshot', fi.files[0]);
+      if (fi?.files?.[0]) {
+        try {
+          const compressed = await compressScreenshotFile(fi.files[0]);
+          fd.append('screenshot', compressed, compressed.name || 'screenshot.jpg');
+        } catch (cmpErr) {
+          fd.append('screenshot', fi.files[0]);
+        }
+      }
     }
 
     try {
-      const res = await fetch('/tspay/orders/', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!data.success) {
-        alert(data.detail || tr('error'));
-        btn.disabled = false;
-        updateWizardUI();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 90000);
+      const res = await fetch('/tspay/orders/', { method: 'POST', body: fd, signal: controller.signal });
+      clearTimeout(timer);
+      if (res.status === 413) {
+        alertError(tr('screenshot_too_large'));
+        return;
+      }
+      const rawText = await res.text();
+      let data = {};
+      if (rawText) {
+        try {
+          data = JSON.parse(rawText);
+        } catch (parseErr) {
+          if (!res.ok) {
+            alertError(rawText.slice(0, 200) || tr('error_server'));
+            return;
+          }
+        }
+      }
+      if (!res.ok || data.success === false) {
+        alertError(formatApiError(data) || tr('error_server'));
         return;
       }
       if (orderState.payment_method === 'admin') {
-        showOrderSuccess(data.order_code);
+        showOrderSuccess(data.order_code || `NMED-${String(data.order_id || '').padStart(5, '0')}`);
         return;
       }
       if (data.payment_url) {
@@ -692,10 +799,14 @@
         return;
       }
     } catch (e) {
-      alert(tr('error') + ': ' + e.message);
+      if (e.name === 'AbortError') alertError(tr('error') + ' (timeout)');
+      else alertError(e.message || tr('error'));
+    } finally {
+      if (!wizardSuccessMode && btn) {
+        btn.disabled = false;
+        updateWizardUI();
+      }
     }
-    btn.disabled = false;
-    updateWizardUI();
   }
 
   function showOrderSuccess(orderCode, subtitle) {
@@ -703,30 +814,48 @@
     const now = new Date();
     const dateStr = now.toLocaleDateString('uz-UZ');
     const timeStr = now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
-    const code = orderCode || '—';
+    const code = escapeHtml(orderCode || '—');
+    const title = escapeHtml(subtitle || tr('success_accepted'));
     const body = document.getElementById('wizardBody');
+    if (!body) {
+      alertError(tr('success_accepted') + (orderCode ? ' #' + orderCode : ''));
+      return;
+    }
+    wizardSuccessMode = true;
     body.innerHTML = `
       <div class="order-success-screen">
-        <div class="success-top-label">${tr('success_label')}</div>
+        <div class="success-top-label">${escapeHtml(tr('success_label'))}</div>
         <div class="success-card-premium">
           <div class="success-check-ring">✓</div>
-          <h2>${subtitle || tr('success_accepted')}</h2>
+          <h2>${title}</h2>
           <ul class="success-steps-list">
-            <li><span class="ss-ic">🧫</span><span>${tr('success_step1')}</span></li>
-            <li><span class="ss-ic">👤</span><span>${tr('success_step2')}</span></li>
-            <li><span class="ss-ic">🔬</span><span>${tr('success_step3')}</span></li>
-            <li><span class="ss-ic">📄</span><span>${tr('success_step4')}</span></li>
+            <li><span class="ss-ic"><i data-lucide="flask-conical"></i></span><span>${escapeHtml(tr('success_step1'))}</span></li>
+            <li><span class="ss-ic"><i data-lucide="phone"></i></span><span>${escapeHtml(tr('success_step2'))}</span></li>
+            <li><span class="ss-ic"><i data-lucide="microscope"></i></span><span>${escapeHtml(tr('success_step3'))}</span></li>
+            <li><span class="ss-ic"><i data-lucide="file-text"></i></span><span>${escapeHtml(tr('success_step4'))}</span></li>
           </ul>
           <div class="success-order-box">
-            <div class="success-order-label">${tr('order_number')}</div>
+            <div class="success-order-label">${escapeHtml(tr('order_number'))}</div>
             <div class="success-order-id">#${code}</div>
             <div class="success-order-date">${dateStr} · ${timeStr}</div>
           </div>
         </div>
-        <button type="button" class="btn-primary success-close-btn" onclick="window.NMED.goHome()">${tr('close')}</button>
+        <button type="button" class="btn-cta success-close-btn" onclick="window.NMED.goHome()">${escapeHtml(tr('close'))}</button>
       </div>`;
     document.querySelector('.wizard-footer')?.classList.add('hidden');
+    const btn = document.getElementById('wizardNextBtn');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = tr('close');
+    }
     showScreen('wizard');
+    try {
+      initIcons();
+    } catch (iconErr) {
+      /* lucide ixtiyoriy */
+    }
+    window.scrollTo(0, 0);
+    body.scrollTop = 0;
   }
 
   /* ── ORDERS ── */
@@ -878,6 +1007,70 @@
     else if (phone) tg.openLink?.('tel:' + phone);
   }
 
+  function bindWizardEvents() {
+    document.getElementById('paymentScreenshot')?.addEventListener('change', onScreenshotChange);
+  }
+
+  /** iPhone skrinshotini siqish — nginx 413 oldini olish */
+  function compressScreenshotFile(file, maxSide = 1600, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+      if (!file || !file.type.startsWith('image/')) {
+        resolve(file);
+        return;
+      }
+      if (file.size < 900000) {
+        resolve(file);
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let w = img.width;
+        let h = img.height;
+        const scale = Math.min(1, maxSide / Math.max(w, h));
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            resolve(new File([blob], 'screenshot.jpg', { type: 'image/jpeg', lastModified: Date.now() }));
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      };
+      img.src = url;
+    });
+  }
+
+  function onScreenshotChange() {
+    const fi = document.getElementById('paymentScreenshot');
+    if (fi?.files?.[0]) {
+      const r = new FileReader();
+      r.onload = (e) => {
+        const img = document.getElementById('screenshotPreviewImg');
+        const box = document.getElementById('screenshotPreview');
+        if (img) img.src = e.target.result;
+        box?.classList.remove('hidden');
+        document.getElementById('screenshotError')?.classList.add('hidden');
+      };
+      r.readAsDataURL(fi.files[0]);
+    }
+  }
+
   /* ── INIT ── */
   document.getElementById('btnBack')?.addEventListener('click', () => {
     if (document.getElementById('screen-wizard')?.classList.contains('active') && wizardStep > 1) {
@@ -898,19 +1091,7 @@
   document.getElementById('btnAppealSend')?.addEventListener('click', submitAppeal);
   document.getElementById('btnSupportTg')?.addEventListener('click', openSupport);
   document.getElementById('btnLoc')?.addEventListener('click', requestLocation);
-
-  document.getElementById('paymentScreenshot')?.addEventListener('change', function () {
-    if (this.files?.[0]) {
-      const r = new FileReader();
-      r.onload = (e) => {
-        const img = document.getElementById('screenshotPreviewImg');
-        const box = document.getElementById('screenshotPreview');
-        if (img) img.src = e.target.result;
-        box?.classList.remove('hidden');
-      };
-      r.readAsDataURL(this.files[0]);
-    }
-  });
+  bindWizardEvents();
 
   window.NMED = {
     selectService,
@@ -928,7 +1109,10 @@
   };
 
   initLang().then(() => {
+    const wb = document.getElementById('wizardBody');
+    if (wb) wizardBodyTemplate = wb.innerHTML;
     applyI18n();
+    initIcons();
     loadSettings().then(() => {
       initHome();
       orderState.tg_id = tgId;
@@ -941,26 +1125,58 @@
     });
   });
 
+  async function pollPaymentStatus(orderId, orderCode, attempts = 8) {
+    const code = orderCode || `NMED-${String(orderId).padStart(5, '0')}`;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const r = await fetch(`/tspay/orders/${orderId}/check_payment/?tg_id=${encodeURIComponent(tgId || '')}`);
+        const result = await r.json();
+        if (result.success && (result.status === 'paid' || result.order_status === 'paid')) {
+          return { paid: true, code: result.order_code || code };
+        }
+        if (result.status === 'failed' || result.status === 'canceled') {
+          return { paid: false, code, detail: result.detail || tr('error') };
+        }
+      } catch (e) {
+        /* retry */
+      }
+      if (i < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
+    return { paid: false, code, pending: true };
+  }
+
   async function checkTspayReturn() {
+    const params = new URLSearchParams(location.search);
+    const fromUrl = params.get('tspay_return');
     const chequeId = sessionStorage.getItem('tspay_cheque_id');
     const orderId = sessionStorage.getItem('tspay_order_id');
     const orderCode = sessionStorage.getItem('tspay_order_code');
-    if (!chequeId || !orderId) return;
+    if (!fromUrl && !chequeId && !orderId) return;
+
+    const oid = orderId || params.get('order_id');
+    if (!oid) return;
+
     sessionStorage.removeItem('tspay_cheque_id');
     sessionStorage.removeItem('tspay_order_id');
     sessionStorage.removeItem('tspay_order_code');
+
     showScreen('wizard');
-    const fallbackCode = orderCode || `NMED-${String(orderId).padStart(5, '0')}`;
-    try {
-      const r = await fetch(`/tspay/orders/${orderId}/check_payment/?tg_id=${tgId || ''}`);
-      const result = await r.json();
-      if (result.status === 'paid' || result.success) {
-        showOrderSuccess(fallbackCode);
-      } else {
-        showOrderSuccess(fallbackCode, tr('pay_checking'));
-      }
-    } catch (e) {
-      showOrderSuccess(fallbackCode);
+    const body = document.getElementById('wizardBody');
+    if (body) {
+      body.innerHTML = `<div class="empty-state" style="padding:48px 24px"><p>${escapeHtml(tr('pay_checking'))}</p></div>`;
     }
+
+    const outcome = await pollPaymentStatus(oid, orderCode);
+    if (outcome.paid) {
+      showOrderSuccess(outcome.code);
+      return;
+    }
+    if (outcome.pending) {
+      showOrderSuccess(outcome.code, tr('pay_checking'));
+      return;
+    }
+    alertError(outcome.detail || tr('error'));
   }
 })();

@@ -78,7 +78,7 @@ class ServiceAdmin(ModelAdmin):
             'fields': ('name_uz', 'name_ru', 'name_en'),
         }),
         ("Moliyaviy va Holat", {
-            'fields': ('price', 'is_active', 'description'),
+            'fields': ('price', 'is_active', 'description', 'icon'),
         }),
     )
 

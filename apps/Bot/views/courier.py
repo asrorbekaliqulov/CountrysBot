@@ -1,4 +1,5 @@
 import json
+from django.db.models import Q
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -53,13 +54,28 @@ def courier_orders_api(request):
     if not tg_id:
         return JsonResponse({'error': 'tg_id talab qilinadi'}, status=400)
 
-    orders = Order.objects.select_related('district', 'service').filter(
-        status__in=['paid', 'delivering', 'done']
-    ).order_by('-created_at')
+    try:
+        courier_user = TelegramUser.objects.get(user_id=tg_id, role='courier')
+    except TelegramUser.DoesNotExist:
+        return JsonResponse({'error': 'Kuryer topilmadi'}, status=403)
+
+    orders = (
+        Order.objects.select_related('district', 'service', 'courier')
+        .filter(
+            Q(courier=courier_user)
+            | Q(
+                courier__isnull=True,
+                district=courier_user.district,
+                status__in=['paid', 'delivering'],
+            ),
+            status__in=['paid', 'delivering', 'done'],
+        )
+        .order_by('-created_at')
+    )
 
     orders_list = []
     for o in orders:
-        phone = getattr(o, 'patient_phone', '') or getattr(o, 'phone', '')
+        phone = o.contact_phone or ''
         if not phone and o.user:
             phone = o.user.phone or o.user.phone_number or ''
 
@@ -82,7 +98,6 @@ def courier_orders_api(request):
             "districtName": district_name,
             "addressNote": address_note,
             "phone": phone,
-            "deliverySlot": getattr(o, 'delivery_slot', None),
             "pickupSlot": getattr(o, 'pickup_slot', None),
             "latitude": float(o.latitude) if getattr(o, 'latitude', None) else None,
             "longitude": float(o.longitude) if getattr(o, 'longitude', None) else None,
@@ -90,9 +105,22 @@ def courier_orders_api(request):
             "serviceName": service_name,
             "totalPrice": total_price,
             "createdAt": o.created_at.strftime('%d.%m.%Y %H:%M') if o.created_at else '',
+            "assignedToMe": o.courier_id == courier_user.id if o.courier_id else False,
+            "unassigned": o.courier_id is None,
         })
 
-    return JsonResponse(orders_list, safe=False)
+    active_ids = [
+        x["orderId"]
+        for x in orders_list
+        if x["status"] in ("paid", "delivering") and x["assignedToMe"]
+    ]
+    batch_hint = len(active_ids) >= 2
+
+    return JsonResponse({
+        "orders": orders_list,
+        "batch_hint": batch_hint,
+        "active_route_count": len(active_ids),
+    }, safe=False)
 
 
 @csrf_exempt
@@ -104,14 +132,25 @@ def courier_order_start_delivery_api(request, order_id):
     'paid' → 'delivering': Kuryer zakazni olib yo'lga chiqdi.
     Bemorga Telegram xabari yuboriladi.
     """
+    tg_id = request.GET.get('tg_id')
     order = get_object_or_404(Order, id=order_id)
 
     if order.status != 'paid':
         return JsonResponse({'error': f"Zakaz holati 'paid' emas, hozir: {order.status}"}, status=400)
 
+    if tg_id:
+        try:
+            courier_user = TelegramUser.objects.get(user_id=tg_id, role='courier')
+            if order.courier_id and order.courier_id != courier_user.id:
+                return JsonResponse({'error': 'Bu buyurtma boshqa kuryerga biriktirilgan'}, status=403)
+            if not order.courier_id:
+                order.courier = courier_user
+        except TelegramUser.DoesNotExist:
+            pass
+
     try:
         order.status = 'delivering'
-        order.save()
+        order.save(update_fields=['status', 'courier'])
         return JsonResponse({'success': True, 'message': 'Kuryer yo\'lga chiqdi. Bemor xabardor qilindi.'})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

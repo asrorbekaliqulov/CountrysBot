@@ -1,4 +1,4 @@
-from apps.Bot.BotCommands.StartCommand import main_menu_callback
+from apps.Bot.BotCommands.StartCommand import main_menu_callback, set_lang_callback
 
 from ..MandatoryChannel import AddChannel_ConvHandler, MandatoryChannelOrGroupList, start_delete_mandatory, delete_mandatory
 from ..BotCommands import start
@@ -66,6 +66,7 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_profile, pattern=r"^my_profile$"))
     app.add_handler(CallbackQueryHandler(InlineButton))
 
+    app.add_handler(CallbackQueryHandler(set_lang_callback, pattern=r"^set_lang:(uz|ru|en)$"))
     app.add_handler(CallbackQueryHandler(
         main_menu_callback,
         pattern="^(feedback|contact_us|appeal|admin_panel|back_to_menu)$"

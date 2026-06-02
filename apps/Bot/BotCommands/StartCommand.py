@@ -218,6 +218,8 @@ async def get_main_menu_keyboard(
                 text=t["results"],
                 web_app=WebAppInfo(url=_webapp_page_url("results", lang, user_id)),
             ),
+        ],
+        [
             InlineKeyboardButton(
                 text=t["order_status"],
                 web_app=WebAppInfo(url=_webapp_page_url("orders", lang, user_id)),
@@ -228,6 +230,8 @@ async def get_main_menu_keyboard(
                 text=t["profile"],
                 web_app=WebAppInfo(url=_webapp_page_url("profile", lang, user_id)),
             ),
+        ],
+        [
             InlineKeyboardButton(
                 text=t["feedback"],
                 web_app=WebAppInfo(url=_webapp_page_url("feedback", lang, user_id)),

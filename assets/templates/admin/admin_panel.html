@@ -685,12 +685,17 @@ async function approveAdminPayment() {
   btn.textContent = '⏳ Tasdiqlanmoqda...';
 
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 45000);
     const res = await fetch(`/tspay/orders/${id}/confirm_payment/?tg_id=${TG_ID}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_admin: true }),
+      signal: controller.signal,
     });
-    const data = await res.json();
+    clearTimeout(timer);
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
 
     if (res.ok && data.success) {
       closeOrderModal();
@@ -698,13 +703,15 @@ async function approveAdminPayment() {
       loadStats();
       loadOrders();
     } else {
-      alert('❌ ' + (data.detail || data.error || `Server xatosi: ${res.status}`));
+      alert('❌ ' + (data.detail || data.error || data.message || `Server xatosi: ${res.status}`));
     }
   } catch(e) {
-    alert('❌ Tarmoq xatosi.');
+    alert(e.name === 'AbortError' ? '❌ Server javob bermadi (timeout)' : '❌ Tarmoq xatosi.');
   } finally {
-    btn.disabled = false;
-    btn.textContent = '✅ To\'lovni Tasdiqlash va Kuryerga Yuborish';
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '✅ To\'lovni Tasdiqlash va Kuryerga Yuborish';
+    }
   }
 }
 
