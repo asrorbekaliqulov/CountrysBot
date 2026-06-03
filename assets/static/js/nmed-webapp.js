@@ -292,6 +292,8 @@
         btn.textContent = tr('continue') + ' →';
       }
     }
+    document.getElementById('wizFootExtra')?.classList.toggle('hidden', wizardStep !== 1);
+    document.getElementById('wizardBody')?.classList.toggle('with-foot-extra', wizardStep === 1);
     applyI18n();
     initIcons();
     flashHelpAttention(wizardStep === 1 || wizardStep === 6);
@@ -395,8 +397,13 @@
     try {
       const data = await api('/api/services/');
       servicesData = Array.isArray(data) ? data : data.results || [];
-      list.innerHTML = servicesData
-        .filter((s) => s.is_active !== false)
+      const active = servicesData.filter((s) => s.is_active !== false);
+      // Eng qimmat (majmua/Premium) paketni "eng ko'p tanlanadigan" deb belgilaymiz.
+      let popularId = null;
+      if (active.length > 1) {
+        popularId = active.reduce((a, b) => (Number(b.price) > Number(a.price) ? b : a)).id;
+      }
+      list.innerHTML = active
         .map((s, idx) => {
           const icCls = ['ic-green', 'ic-purple', 'ic-blue', 'ic-amber'][idx % 4];
           const iconHtml = s.icon_url
@@ -404,6 +411,9 @@
             : `<span>🧪</span>`;
           const subtitle = s.description
             ? `<div class="srv-subtitle">${s.description}</div>`
+            : '';
+          const badge = s.id === popularId
+            ? `<div class="srv-badge"><i data-lucide="star"></i><span>${tr('popular_pack')}</span></div>`
             : '';
           return `
         <div class="card-white" id="srv_${s.id}" onclick="window.NMED.selectService(${s.id})">
@@ -413,12 +423,15 @@
               <div class="srv-name">${serviceName(s)}</div>
               ${subtitle}
               <div class="srv-price">${Number(s.price).toLocaleString()} ${tr('currency')}</div>
+              ${badge}
             </div>
             <span class="srv-chevron">›</span>
+            <span class="srv-check" aria-hidden="true"><i data-lucide="check"></i></span>
           </div>
         </div>`;
         })
         .join('');
+      initIcons();
     } catch (e) {
       list.innerHTML = '<div class="empty-state">' + tr('services_fail') + '</div>';
     }
