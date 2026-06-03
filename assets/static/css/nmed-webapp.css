@@ -315,12 +315,10 @@ html.tg-webapp .app-shell {
 .wiz1-head-text { flex: 1; min-width: 0; }
 .wiz1-head-ic {
   flex-shrink: 0;
-  width: 62px; height: 62px;
+  width: 72px; height: 72px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(20,184,166,0.08);
-  border: 1.5px solid rgba(20,184,166,0.28);
-  border-radius: 18px;
 }
+.wiz1-head-ic img { width: 100%; height: 100%; object-fit: contain; }
 .wiz1-head-ic svg { width: 32px; height: 32px; stroke: var(--teal-deep); fill: none; }
 
 /* Service cards */
