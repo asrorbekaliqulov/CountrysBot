@@ -19,8 +19,8 @@
   --warn: #f59e0b;
   --gold: #0d9488;
   --gold-light: #14b8a6;
-  --indigo: #2b2f86;
-  --indigo-2: #4853c9;
+  --indigo: #4a55d6;
+  --indigo-2: #6470f0;
 }
 
 * { box-sizing: border-box; }
@@ -198,7 +198,7 @@ html.tg-webapp .app-shell {
 .btn-cta-indigo {
   position: relative;
   background: linear-gradient(135deg, var(--indigo-2), var(--indigo)) !important;
-  box-shadow: 0 12px 30px rgba(43,47,134,0.40);
+  box-shadow: 0 12px 28px rgba(74,85,214,0.35);
   border-radius: 18px;
   padding: 19px 24px;
 }
