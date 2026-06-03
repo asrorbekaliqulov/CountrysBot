@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="{% static 'css/nmed-webapp.css' %}?v=9">
+  <link rel="stylesheet" href="{% static 'css/nmed-webapp.css' %}?v=13">
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -32,7 +32,7 @@
     <div class="home-inner">
       <div class="home-brand-center">
         <div class="home-flask-wrap">
-          <div class="home-flask-icon"><i data-lucide="flask-conical"></i></div>
+          <img src="{% static 'img/nmed-logo.png' %}?v=13" alt="NMED HOME LAB" class="home-logo-img" width="120" height="120">
         </div>
         <div class="home-brand-name">
           <span class="home-nmed">NMED</span>
@@ -94,6 +94,12 @@
 
   <!-- WIZARD -->
   <section id="screen-wizard" class="screen">
+    <button type="button" class="wiz-help-btn" id="wizHelpBtn" aria-label="Yordam" title="Yordam">
+      <i data-lucide="help-circle"></i>
+      <span class="wiz-help-dot" aria-hidden="true"></span>
+    </button>
+    <div class="wiz-help-hint hidden" id="wizHelpHint" role="status"><span class="wiz-help-hint-text"></span></div>
+    <div class="wiz-help-spotlight hidden" id="wizHelpSpot" aria-hidden="true"></div>
     <div class="wizard-body" id="wizardBody">
       {% csrf_token %}
       <div class="wizard-progress">
@@ -155,7 +161,7 @@
       </div>
 
       <div class="wizard-step" data-step="6">
-        <h2 data-i18n="wiz6_title">Yetkazish vaqti</h2>
+        <h2 data-i18n="wiz6_title">Konteynerni (nabor) uyingizga yetkazib berish vaqtimiz</h2>
         <p class="sub" data-i18n="wiz6_sub">Yetkazish faqat kechqurun — 18:00 dan 22:00 gacha</p>
         <div id="slotsBox" class="slot-grid"></div>
       </div>
@@ -206,6 +212,7 @@
           <div class="summary-row"><span data-i18n="sum_patient">Bemor</span><b id="summaryPatient">—</b></div>
           <div class="summary-row"><span data-i18n="sum_time">Vaqt</span><b id="summaryTime">—</b></div>
           <div class="summary-row"><span data-i18n="sum_delivery">Yetkazish</span><b id="summaryDelivery">—</b></div>
+          <div class="summary-divider"><span data-i18n="sum_total_label">Umumiy xizmat narxi</span></div>
           <div class="summary-row summary-total"><span data-i18n="sum_total">Jami</span><b id="summaryTotal">—</b></div>
         </div>
         <textarea class="input-field input-lg" id="extraComplaint" rows="2" data-i18n-ph="ph_extra_complaint" placeholder="Qo'shimcha shikoyat (ixtiyoriy)"></textarea>
@@ -296,9 +303,19 @@
       </div>
     </div>
   </section>
+
+  <!-- HELP MODAL (qadam bo'yicha tushuntirish) -->
+  <div class="help-modal-overlay hidden" id="helpModal" role="dialog" aria-modal="true">
+    <div class="help-modal">
+      <button type="button" class="help-modal-close" id="helpModalClose" aria-label="Yopish">&times;</button>
+      <div class="help-modal-icon"><i data-lucide="help-circle"></i></div>
+      <h3 class="help-modal-title" id="helpModalTitle"></h3>
+      <div class="help-modal-body" id="helpModalBody"></div>
+    </div>
+  </div>
 </div>
 
-<script src="{% static 'js/nmed-i18n.js' %}?v=9"></script>
-<script src="{% static 'js/nmed-webapp.js' %}?v=9"></script>
+<script src="{% static 'js/nmed-i18n.js' %}?v=13"></script>
+<script src="{% static 'js/nmed-webapp.js' %}?v=13"></script>
 </body>
 </html>

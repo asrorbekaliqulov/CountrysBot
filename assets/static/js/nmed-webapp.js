@@ -294,6 +294,7 @@
     }
     applyI18n();
     initIcons();
+    flashHelpAttention(wizardStep === 1 || wizardStep === 6);
   }
 
   function wizardNext() {
@@ -1105,6 +1106,64 @@
   document.getElementById('btnSupportTg')?.addEventListener('click', openSupport);
   document.getElementById('btnLoc')?.addEventListener('click', requestLocation);
   bindWizardEvents();
+
+  // ── Qadam yordami (help popup) ────────────────────────────────────────────
+  function openStepHelp() {
+    clearHelpAttention();
+    const activeStep = document.querySelector('.wizard-step.active');
+    const step = activeStep ? activeStep.dataset.step : String(wizardStep);
+    const titleEl = document.getElementById('helpModalTitle');
+    const bodyEl = document.getElementById('helpModalBody');
+    const overlay = document.getElementById('helpModal');
+    if (!titleEl || !bodyEl || !overlay) return;
+    const title = tr('help' + step + '_title');
+    const body = tr('help' + step + '_body');
+    titleEl.textContent = typeof title === 'string' ? title : tr('help_default_title');
+    bodyEl.innerHTML = typeof body === 'string' ? body : tr('help_default_body');
+    overlay.classList.remove('hidden');
+    initIcons();
+  }
+  function closeStepHelp() {
+    document.getElementById('helpModal')?.classList.add('hidden');
+  }
+  document.getElementById('wizHelpBtn')?.addEventListener('click', openStepHelp);
+  document.getElementById('helpModalClose')?.addEventListener('click', closeStepHelp);
+  document.getElementById('helpModal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeStepHelp();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeStepHelp();
+  });
+  document.getElementById('wizHelpHint')?.addEventListener('click', openStepHelp);
+  document.getElementById('wizHelpSpot')?.addEventListener('click', clearHelpAttention);
+
+  // ── "?" tugmasiga e'tibor tortish: strelka + qizil nuqta + kattalashish + fokus ──
+  let helpAttnTimer = null;
+  function clearHelpAttention() {
+    if (helpAttnTimer) { clearTimeout(helpAttnTimer); helpAttnTimer = null; }
+    document.getElementById('wizHelpBtn')?.classList.remove('attention', 'attention-strong');
+    document.getElementById('wizHelpHint')?.classList.add('hidden');
+    document.getElementById('wizHelpSpot')?.classList.add('hidden');
+    document.body.classList.remove('help-focus-on');
+  }
+  function flashHelpAttention(strong) {
+    const btn = document.getElementById('wizHelpBtn');
+    if (!btn) return;
+    clearHelpAttention();
+    const hint = document.getElementById('wizHelpHint');
+    if (hint) {
+      const span = hint.querySelector('.wiz-help-hint-text') || hint;
+      span.textContent = tr('help_hint');
+      hint.classList.remove('hidden');
+    }
+    btn.classList.add('attention');
+    if (strong) {
+      btn.classList.add('attention-strong');
+      document.getElementById('wizHelpSpot')?.classList.remove('hidden');
+      document.body.classList.add('help-focus-on');
+    }
+    helpAttnTimer = setTimeout(clearHelpAttention, strong ? 4200 : 2600);
+  }
 
   window.NMED = {
     selectService,
