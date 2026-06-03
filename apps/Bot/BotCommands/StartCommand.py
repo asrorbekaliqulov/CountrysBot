@@ -176,6 +176,15 @@ def _clean_lang(lang: str) -> str:
     return code if code in ("uz", "ru", "en") else "uz"
 
 
+def _match_tg_lang(language_code) -> str:
+    """Telegram interfeys tilini ('uz-UZ', 'ru', 'en-US' ...) qo'llab-quvvatlanadigan
+    tilga moslaydi. Mos kelmasa None qaytaradi — bu holda mavjud til saqlanadi."""
+    if not language_code:
+        return None
+    code = language_code.lower().split("-")[0].split("_")[0]
+    return code if code in ("uz", "ru", "en") else None
+
+
 def _webapp_page_url(page: str, lang: str, user_id: int = None) -> str:
     base = f"{WEB_APP_URL.rstrip('/')}/api/webapp/"
     connector = "?"
@@ -306,6 +315,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not lang_chosen and user_role == "user" and not is_admin:
         await show_language_picker(update, context)
         return ConversationHandler.END
+
+    # ── 3c. Keyingi /start — tilni Telegram interfeys tilidan avtomatik yangilash ──
+    #   Update ichidagi language_code ('uz' | 'ru' | 'en') bo'yicha bot tilini sinxron
+    #   qiladi. Mos kelmasa (masalan 'fr') mavjud til o'zgarmaydi.
+    tg_lang = _match_tg_lang(tg_user.language_code)
+    if tg_lang and tg_lang != _clean_lang(user_lang):
+        user_lang = tg_lang
+
+        @sync_to_async
+        def sync_lang():
+            TelegramUser.objects.filter(user_id=tg_user.id).update(lang=tg_lang)
+
+        await sync_lang()
 
     lang = _clean_lang(user_lang)
     

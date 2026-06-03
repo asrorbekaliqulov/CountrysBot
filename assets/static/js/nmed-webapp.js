@@ -5,9 +5,11 @@
     tg.ready();
     tg.expand();
     if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
-    if (tg.requestFullscreen) {
+    // Fullscreen rejimini ishlatmaymiz — Telegram'ning o'z sarlavhasi (nomi va
+    // yopish tugmasi) ko'rinib tursin, kontent esa tepaga yopishib qolmasin.
+    if (tg.isFullscreen && tg.exitFullscreen) {
       try {
-        tg.requestFullscreen();
+        tg.exitFullscreen();
       } catch (e) {
         /* eski Telegram versiyalari */
       }
@@ -179,8 +181,16 @@
     document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
     const el = document.getElementById(`screen-${name}`);
     if (el) el.classList.add('active');
+    const showBack = name !== 'home' && !wizardSuccessMode;
     const backBtn = document.getElementById('btnBack');
-    if (backBtn) backBtn.classList.toggle('visible', name !== 'home' && !wizardSuccessMode);
+    // Telegram ichida — uning o'z BackButton'i; brauzerda — header'dagi tugma.
+    if (tg?.BackButton) {
+      if (showBack) tg.BackButton.show();
+      else tg.BackButton.hide();
+      if (backBtn) backBtn.classList.remove('visible');
+    } else if (backBtn) {
+      backBtn.classList.toggle('visible', showBack);
+    }
     const header = document.getElementById('appHeader');
     if (header) {
       header.classList.toggle('hidden', name === 'home' || wizardSuccessMode);
@@ -1072,11 +1082,14 @@
   }
 
   /* ── INIT ── */
-  document.getElementById('btnBack')?.addEventListener('click', () => {
+  function handleBack() {
     if (document.getElementById('screen-wizard')?.classList.contains('active') && wizardStep > 1) {
       wizardPrev();
     } else goHome();
-  });
+  }
+
+  document.getElementById('btnBack')?.addEventListener('click', handleBack);
+  if (tg?.BackButton) tg.BackButton.onClick(handleBack);
 
   document.getElementById('btnOrderMain')?.addEventListener('click', startWizard);
   document.querySelectorAll('[data-goto]').forEach((el) => {
