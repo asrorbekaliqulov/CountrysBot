@@ -537,26 +537,26 @@ textarea.input-field { height: auto; padding: 14px 16px; resize: vertical; }
 .wiz-foot-extra { margin-top: 10px; }
 .wiz-foot-extra.hidden { display: none; }
 .step1-feat-strip {
-  display: flex; gap: 4px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 12px 6px;
-  box-shadow: 0 6px 18px rgba(15,23,42,0.05);
+  display: flex; gap: 8px;
 }
 .step1-feat-strip span {
   flex: 1; min-width: 0;
-  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
   text-align: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 4px;
+  box-shadow: 0 3px 10px rgba(15,23,42,0.04);
 }
-.step1-feat-strip svg { width: 19px; height: 19px; stroke: var(--teal-deep); fill: none; flex-shrink: 0; }
-.step1-feat-strip small { font-size: 9.5px; font-weight: 600; color: #475569; line-height: 1.2; }
+.step1-feat-strip svg { width: 18px; height: 18px; stroke: var(--teal-deep); fill: none; flex-shrink: 0; }
+.step1-feat-strip small { font-size: 10px; font-weight: 600; color: #475569; line-height: 1.2; }
 .wiz-secure-note {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   margin-top: 10px; color: var(--muted);
-  font-size: 12px; font-weight: 500;
+  font-size: 11.5px; font-weight: 500;
 }
-.wiz-secure-note svg { width: 14px; height: 14px; stroke: var(--muted); fill: none; }
+.wiz-secure-note svg { width: 13px; height: 13px; stroke: var(--muted); fill: none; }
 
 /* Location / map */
 .loc-spinner { text-align: center; font-size: 13px; color: var(--gold); padding: 10px; font-weight: 600; }
