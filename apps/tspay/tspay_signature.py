@@ -20,9 +20,14 @@ def webhook_secret() -> str:
 
 
 def build_signature_message(order_id, amount, timestamp: str) -> str:
-    """HMAC payload: order_id:amount:timestamp (docs)."""
+    """HMAC payload: order_id:amount:timestamp.
+
+    TSPay imzoni `amount` ning float ko'rinishi bilan hisoblaydi (masalan
+    `1000.0`), shuning uchun bu yerda ham `float(amount)` ishlatiladi — aks
+    holda imzo mos kelmaydi va webhook rad etiladi.
+    """
     oid = '' if order_id is None else str(order_id)
-    amt = int(round(float(amount)))
+    amt = float(amount)
     return f'{oid}:{amt}:{timestamp}'
 
 

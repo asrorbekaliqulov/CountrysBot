@@ -144,7 +144,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://api.tspay.uz",
 ]
 
-_webapp_url = os.environ.get("WEBAPP_URL", "https://yourdomain.com").rstrip("/")
+_webapp_url = os.environ.get("WEBAPP_URL", "https://n-medhomelab.uz").rstrip("/")
 if _webapp_url:
     CORS_ALLOWED_ORIGINS.append(_webapp_url)
 

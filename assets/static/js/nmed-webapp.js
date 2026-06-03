@@ -5,9 +5,11 @@
     tg.ready();
     tg.expand();
     if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
-    if (tg.requestFullscreen) {
+    // Fullscreen rejimini ishlatmaymiz — Telegram'ning o'z sarlavhasi (nomi va
+    // yopish tugmasi) ko'rinib tursin, kontent esa tepaga yopishib qolmasin.
+    if (tg.isFullscreen && tg.exitFullscreen) {
       try {
-        tg.requestFullscreen();
+        tg.exitFullscreen();
       } catch (e) {
         /* eski Telegram versiyalari */
       }
@@ -179,8 +181,16 @@
     document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
     const el = document.getElementById(`screen-${name}`);
     if (el) el.classList.add('active');
+    const showBack = name !== 'home' && !wizardSuccessMode;
     const backBtn = document.getElementById('btnBack');
-    if (backBtn) backBtn.classList.toggle('visible', name !== 'home' && !wizardSuccessMode);
+    // Telegram ichida — uning o'z BackButton'i; brauzerda — header'dagi tugma.
+    if (tg?.BackButton) {
+      if (showBack) tg.BackButton.show();
+      else tg.BackButton.hide();
+      if (backBtn) backBtn.classList.remove('visible');
+    } else if (backBtn) {
+      backBtn.classList.toggle('visible', showBack);
+    }
     const header = document.getElementById('appHeader');
     if (header) {
       header.classList.toggle('hidden', name === 'home' || wizardSuccessMode);
@@ -282,8 +292,11 @@
         btn.textContent = tr('continue') + ' →';
       }
     }
+    document.getElementById('wizFootExtra')?.classList.toggle('hidden', wizardStep !== 1);
+    document.getElementById('wizardBody')?.classList.toggle('with-foot-extra', wizardStep === 1);
     applyI18n();
     initIcons();
+    flashHelpAttention(wizardStep === 1 || wizardStep === 6);
   }
 
   function wizardNext() {
@@ -384,8 +397,13 @@
     try {
       const data = await api('/api/services/');
       servicesData = Array.isArray(data) ? data : data.results || [];
-      list.innerHTML = servicesData
-        .filter((s) => s.is_active !== false)
+      const active = servicesData.filter((s) => s.is_active !== false);
+      // Eng qimmat (majmua/Premium) paketni "eng ko'p tanlanadigan" deb belgilaymiz.
+      let popularId = null;
+      if (active.length > 1) {
+        popularId = active.reduce((a, b) => (Number(b.price) > Number(a.price) ? b : a)).id;
+      }
+      list.innerHTML = active
         .map((s, idx) => {
           const icCls = ['ic-green', 'ic-purple', 'ic-blue', 'ic-amber'][idx % 4];
           const iconHtml = s.icon_url
@@ -393,6 +411,9 @@
             : `<span>🧪</span>`;
           const subtitle = s.description
             ? `<div class="srv-subtitle">${s.description}</div>`
+            : '';
+          const badge = s.id === popularId
+            ? `<div class="srv-badge"><i data-lucide="star"></i><span>${tr('popular_pack')}</span></div>`
             : '';
           return `
         <div class="card-white" id="srv_${s.id}" onclick="window.NMED.selectService(${s.id})">
@@ -402,12 +423,15 @@
               <div class="srv-name">${serviceName(s)}</div>
               ${subtitle}
               <div class="srv-price">${Number(s.price).toLocaleString()} ${tr('currency')}</div>
+              ${badge}
             </div>
             <span class="srv-chevron">›</span>
+            <span class="srv-check" aria-hidden="true"><i data-lucide="check"></i></span>
           </div>
         </div>`;
         })
         .join('');
+      initIcons();
     } catch (e) {
       list.innerHTML = '<div class="empty-state">' + tr('services_fail') + '</div>';
     }
@@ -1072,11 +1096,14 @@
   }
 
   /* ── INIT ── */
-  document.getElementById('btnBack')?.addEventListener('click', () => {
+  function handleBack() {
     if (document.getElementById('screen-wizard')?.classList.contains('active') && wizardStep > 1) {
       wizardPrev();
     } else goHome();
-  });
+  }
+
+  document.getElementById('btnBack')?.addEventListener('click', handleBack);
+  if (tg?.BackButton) tg.BackButton.onClick(handleBack);
 
   document.getElementById('btnOrderMain')?.addEventListener('click', startWizard);
   document.querySelectorAll('[data-goto]').forEach((el) => {
@@ -1092,6 +1119,64 @@
   document.getElementById('btnSupportTg')?.addEventListener('click', openSupport);
   document.getElementById('btnLoc')?.addEventListener('click', requestLocation);
   bindWizardEvents();
+
+  // ── Qadam yordami (help popup) ────────────────────────────────────────────
+  function openStepHelp() {
+    clearHelpAttention();
+    const activeStep = document.querySelector('.wizard-step.active');
+    const step = activeStep ? activeStep.dataset.step : String(wizardStep);
+    const titleEl = document.getElementById('helpModalTitle');
+    const bodyEl = document.getElementById('helpModalBody');
+    const overlay = document.getElementById('helpModal');
+    if (!titleEl || !bodyEl || !overlay) return;
+    const title = tr('help' + step + '_title');
+    const body = tr('help' + step + '_body');
+    titleEl.textContent = typeof title === 'string' ? title : tr('help_default_title');
+    bodyEl.innerHTML = typeof body === 'string' ? body : tr('help_default_body');
+    overlay.classList.remove('hidden');
+    initIcons();
+  }
+  function closeStepHelp() {
+    document.getElementById('helpModal')?.classList.add('hidden');
+  }
+  document.getElementById('wizHelpBtn')?.addEventListener('click', openStepHelp);
+  document.getElementById('helpModalClose')?.addEventListener('click', closeStepHelp);
+  document.getElementById('helpModal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeStepHelp();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeStepHelp();
+  });
+  document.getElementById('wizHelpHint')?.addEventListener('click', openStepHelp);
+  document.getElementById('wizHelpSpot')?.addEventListener('click', clearHelpAttention);
+
+  // ── "?" tugmasiga e'tibor tortish: strelka + qizil nuqta + kattalashish + fokus ──
+  let helpAttnTimer = null;
+  function clearHelpAttention() {
+    if (helpAttnTimer) { clearTimeout(helpAttnTimer); helpAttnTimer = null; }
+    document.getElementById('wizHelpBtn')?.classList.remove('attention', 'attention-strong');
+    document.getElementById('wizHelpHint')?.classList.add('hidden');
+    document.getElementById('wizHelpSpot')?.classList.add('hidden');
+    document.body.classList.remove('help-focus-on');
+  }
+  function flashHelpAttention(strong) {
+    const btn = document.getElementById('wizHelpBtn');
+    if (!btn) return;
+    clearHelpAttention();
+    const hint = document.getElementById('wizHelpHint');
+    if (hint) {
+      const span = hint.querySelector('.wiz-help-hint-text') || hint;
+      span.textContent = tr('help_hint');
+      hint.classList.remove('hidden');
+    }
+    btn.classList.add('attention');
+    if (strong) {
+      btn.classList.add('attention-strong');
+      document.getElementById('wizHelpSpot')?.classList.remove('hidden');
+      document.body.classList.add('help-focus-on');
+    }
+    helpAttnTimer = setTimeout(clearHelpAttention, strong ? 4200 : 2600);
+  }
 
   window.NMED = {
     selectService,
