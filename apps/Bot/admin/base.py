@@ -1,8 +1,8 @@
 from django.contrib import admin
 from ..models.TelegramBot import TelegramUser, Channel, Referral, Guide, Appeal
 from ..models.feedback import Feedback
-from django.contrib import admin
 from unfold.admin import ModelAdmin
+from unfold.decorators import action, display
 
 
 @admin.register(TelegramUser)
@@ -81,8 +81,6 @@ class FeedbackAdmin(ModelAdmin):
     @action(description="📊 Reyting statistikasini ko'rsatish")
     def show_rating_stats(self, request, queryset):
         """Admin panelida reyting statistikasini ko'rsatish"""
-        from apps.Bot.models.feedback import Feedback
-        
         stats = Feedback.get_rating_stats()
         
         message = f"""
@@ -105,13 +103,9 @@ class FeedbackAdmin(ModelAdmin):
         
         self.message_user(request, message, messages.SUCCESS)
 
-from django.contrib import admin
 from django.utils.html import format_html
 from django.contrib import messages
-
-# django-unfold uchun kerakli klasslarni import qilamiz
 from unfold.admin import ModelAdmin, StackedInline, TabularInline
-from unfold.decorators import action, display
 
 from apps.Bot.models.orders import Service, Order, Payment
 from apps.Bot.models.bot import Region, District, BotSetting
