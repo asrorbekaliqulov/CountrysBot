@@ -1,5 +1,6 @@
 from django.contrib import admin
 from ..models.TelegramBot import TelegramUser, Channel, Referral, Guide, Appeal
+from ..models.feedback import Feedback
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
@@ -35,6 +36,74 @@ class AppealAdmin(ModelAdmin):
     list_display = ('user', 'message', 'created_at')
     search_fields = ('user__username', 'message')
     list_filter = ('created_at',)
+
+
+@admin.register(Feedback)
+class FeedbackAdmin(ModelAdmin):
+    """Fikr va baholash boshqaruvi"""
+    list_display = ('user', 'rating_display', 'text_preview', 'is_suggestion_only', 'created_at')
+    list_filter = ('rating', 'is_suggestion_only', 'created_at')
+    search_fields = ('user__username', 'user__first_name', 'text')
+    readonly_fields = ('created_at',)
+    actions = ['show_rating_stats']
+
+    fieldsets = (
+        ("Foydalanuvchi", {
+            'fields': ('user',),
+        }),
+        ("Baholash", {
+            'fields': ('rating', 'is_suggestion_only'),
+        }),
+        ("Fikr matni", {
+            'fields': ('text',),
+        }),
+        ("Ma'lumotlar", {
+            'fields': ('created_at',),
+            'classes': ('collapse',),
+        }),
+    )
+
+    @display(description="Baholash")
+    def rating_display(self, obj):
+        if obj.rating:
+            stars = '⭐' * obj.rating
+            return f"{stars} ({obj.rating}/5)"
+        return "Baholanmagan"
+
+    @display(description="Fikr matni")
+    def text_preview(self, obj):
+        if obj.text:
+            if len(obj.text) > 50:
+                return f"{obj.text[:50]}..."
+            return obj.text
+        return "Matn yo'q"
+
+    @action(description="📊 Reyting statistikasini ko'rsatish")
+    def show_rating_stats(self, request, queryset):
+        """Admin panelida reyting statistikasini ko'rsatish"""
+        from apps.Bot.models.feedback import Feedback
+        
+        stats = Feedback.get_rating_stats()
+        
+        message = f"""
+📊 <b>Reyting Statistikasi</b>
+
+⭐️ <b>O'rtacha reyting:</b> {stats['average_rating']}/5
+👥 <b>Jami ovozlar:</b> {stats['total_votes']}
+
+📈 <b>Baholash taqsimoti:</b>
+   ⭐ (1): {stats['by_rating'][1]} ta
+   ⭐⭐ (2): {stats['by_rating'][2]} ta
+   ⭐⭐⭐ (3): {stats['by_rating'][3]} ta
+   ⭐⭐⭐⭐ (4): {stats['by_rating'][4]} ta
+   ⭐⭐⭐⭐⭐ (5): {stats['by_rating'][5]} ta
+
+👍 <b>Yoqganlar (4-5 yulduz):</b> {stats['liked_count']} ta
+😐 <b>Neytral (3 yulduz):</b> {stats['neutral_count']} ta
+👎 <b>Yoqmaganlar (1-2 yulduz):</b> {stats['disliked_count']} ta
+        """
+        
+        self.message_user(request, message, messages.SUCCESS)
 
 from django.contrib import admin
 from django.utils.html import format_html

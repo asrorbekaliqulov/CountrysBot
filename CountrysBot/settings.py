@@ -144,7 +144,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://api.tspay.uz",
 ]
 
-_webapp_url = os.environ.get("WEBAPP_URL", "https://yourdomain.com").rstrip("/")
+_webapp_url = os.environ.get("WEBAPP_URL", "https://n-medhomelab.uz").rstrip("/")
 if _webapp_url:
     CORS_ALLOWED_ORIGINS.append(_webapp_url)
 
@@ -176,7 +176,12 @@ CELERY_TASK_SERIALIZER  = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT   = ["json"]
 CELERY_TIMEZONE         = TIME_ZONE
-CELERY_BEAT_SCHEDULE    = {}
+CELERY_BEAT_SCHEDULE    = {
+    'update-bot-bio': {
+        'task': 'apps.Bot.tasks.update_bot_bio',
+        'schedule': 7 * 24 * 60 * 60,  # 1 hafta (har hafta ishlaydi)
+    },
+}
 
 # ─── GEOPY ────────────────────────────────────────────────────────────────────
 GEOPY_USER_AGENT = os.environ.get("GEOPY_USER_AGENT", "medbot_uz_v1")

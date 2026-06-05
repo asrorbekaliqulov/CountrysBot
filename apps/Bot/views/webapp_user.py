@@ -13,6 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from apps.Bot.models.TelegramBot import TelegramUser, Appeal
 from apps.Bot.models.bot import BotSetting
 from apps.Bot.models.orders import Order, TestResult
+from apps.Bot.models.feedback import Feedback
 
 logger = logging.getLogger(__name__)
 
@@ -106,16 +107,27 @@ def _order_timeline(status: str) -> list:
 
 def webapp_view(request):
     user_lang = request.GET.get('lang')
+    
+    # URLdan til kelmasa, bazadan olish
     if user_lang not in ('uz', 'ru', 'en'):
         tg_id = request.GET.get('tg_id')
         if tg_id:
             user = _get_user_or_none(tg_id)
             if user and user.lang in ('uz', 'ru', 'en'):
                 user_lang = user.lang
+    
+    # Tilni faollashtirish
     if user_lang in ('uz', 'ru', 'en'):
         translation.activate(user_lang)
         request.LANGUAGE_CODE = user_lang
-    return render(request, 'webapp/app.html')
+    else:
+        # Default til
+        user_lang = 'uz'
+        translation.activate(user_lang)
+        request.LANGUAGE_CODE = user_lang
+    
+    # Template contextga tilni qo'shish
+    return render(request, 'webapp/app.html', {'user_lang': user_lang})
 
 
 @csrf_exempt
@@ -300,6 +312,110 @@ def webapp_appeal_api(request):
     except Exception as e:
         logger.exception('Appeal xatosi: %s', e)
         return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+def webapp_feedback_api(request):
+    """POST — baholash va fikr qoldirish."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Faqat POST'}, status=405)
+
+    try:
+        if request.content_type and 'application/json' in request.content_type:
+            data = json.loads(request.body)
+        else:
+            data = request.POST
+
+        tg_id = data.get('tg_id')
+        rating = data.get('rating')
+        text = (data.get('text') or '').strip()
+        is_suggestion_only = data.get('is_suggestion_only', False)
+
+        if not tg_id:
+            return JsonResponse({'error': 'tg_id talab qilinadi'}, status=400)
+
+        if not rating and not text:
+            return JsonResponse({'error': 'Baholash yoki fikr matni talab qilinadi'}, status=400)
+
+        user = _get_user_or_none(tg_id)
+        if not user:
+            return JsonResponse({'error': 'Foydalanuvchi topilmadi'}, status=404)
+
+        # Agar faqat taklif bo'lsa
+        if is_suggestion_only:
+            Feedback.objects.create(
+                user=user,
+                rating=None,
+                text=text,
+                is_suggestion_only=True
+            )
+            return JsonResponse({'success': True, 'message': 'Taklifingiz qabul qilindi'})
+
+        # Baholash bilan birga yoki faqat baholash
+        if rating:
+            try:
+                rating = int(rating)
+                if rating < 1 or rating > 5:
+                    return JsonResponse({'error': 'Baholash 1-5 orasida bo\'lishi kerak'}, status=400)
+            except (ValueError, TypeError):
+                return JsonResponse({'error': 'Baholash noto\'g\'ri formatda'}, status=400)
+
+        Feedback.objects.create(
+            user=user,
+            rating=rating if rating else None,
+            text=text if text else None,
+            is_suggestion_only=False
+        )
+
+        return JsonResponse({'success': True, 'message': 'Fikringiz qabul qilindi'})
+    except Exception as e:
+        logger.exception('Feedback xatosi: %s', e)
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+def webapp_trust_api(request):
+    """GET — 'Nega bizga ishonishadi' bo'limi ma'lumotlari"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Faqat GET'}, status=405)
+
+    try:
+        from django.conf import settings
+        import os
+
+        # text.txt faylini o'qish
+        base_dir = settings.BASE_DIR
+        text_file_path = os.path.join(base_dir, 'text.txt')
+        pdf_file_path = os.path.join(base_dir, 'shartnoma.pdf')
+
+        text_content = ""
+        if os.path.exists(text_file_path):
+            with open(text_file_path, 'r', encoding='utf-8') as f:
+                text_content = f.read()
+
+        # PDF fayl URL
+        pdf_url = ""
+        if os.path.exists(pdf_file_path):
+            pdf_url = "/media/shartnoma.pdf"
+
+        # Certificate ma'lumotlari
+        certificate_info = {
+            'company_name': 'NASH MEDTEXNIKA Xususiy korxona',
+            'registration_number': '637862',
+            'stir': '305766664',
+            'registration_date': '21.09.2018',
+            'address': 'Toshkent shahri, Mirzo Ulug\'bek tumani, MARKAZ-2, 13-UY, 30-XONADON',
+        }
+
+        return JsonResponse({
+            'success': True,
+            'text_content': text_content,
+            'pdf_url': pdf_url,
+            'certificate_info': certificate_info,
+        })
+    except Exception as e:
+        logger.exception('Trust API xatosi: %s', e)
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 def get_admin_settings_response():
