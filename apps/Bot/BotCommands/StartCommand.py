@@ -1,4 +1,5 @@
 import os
+import logging
 from telegram.ext import ContextTypes, ConversationHandler
 from telegram import (
     Update,
@@ -13,11 +14,155 @@ from ..utils import save_user_to_db
 from ..models.TelegramBot import TelegramUser
 from ..decorators import typing_action, mandatory_channel_required
 
+logger = logging.getLogger(__name__)
+
 # ─── WebApp URL ────────────────────────────────────────────────────────────────
 WEB_APP_URL = os.getenv(
     "WEB_APP_URL",
     "https://n-medhomelab.uz/",
 )
+
+# ─── Tanishtiruv videosi (intro) ────────────────────────────────────────────────
+# /start bosilganda welcome xabardan oldin yuboriladigan video.
+# 83MB lik IMG_6452.MOV Telegram bot limitidan (50MB) katta, shuning uchun
+# ffmpeg bilan siqilgan intro_video.mp4 ishlatiladi.
+BASE_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..")
+)
+INTRO_VIDEO_PATH = os.getenv(
+    "INTRO_VIDEO_PATH",
+    os.path.join(BASE_DIR, "intro_video.mp4"),
+)
+# Telegram bir marta yuklangan videoni file_id orqali qayta ishlatadi —
+# har /start da qayta yuklamaslik uchun file_id ni diskka keshlaymiz.
+INTRO_VIDEO_FILEID_CACHE = os.path.join(BASE_DIR, ".intro_video_file_id")
+
+# Videoning matnli varianti (tugma bosilganda chiqadi).
+INTRO_VIDEO_TEXT = (
+    "<b>NMED HOME LAB</b>\n\n"
+    "UMUMIY KAL VA ICHAK PARAZITLARIGA ANALIZ TOPSHIRISH ENDI ANCHA OSON.\n\n"
+    "Endi laboratoriyaga borish,\n"
+    "navbat kutish\n"
+    "yoki vaqt yo'qotish shart emas.\n\n"
+    "NMED HOME LAB sizning uyingizga maxsus konteyner yetkazib beradi.\n\n"
+    "Analiz topshirish tartibi juda oddiy:\n\n"
+    "✅ Najas namunasi taxminan 10–15 gramm olinadi\n"
+    "✅ Namuna 3 kun davomida yig'iladi\n"
+    "✅ Maxsus konteynerda saqlanadi\n"
+    "✅ Tayyor namuna bizning manzilga chiqarib yuboriladi va hodimlarimiz qabul qilib oladi\n"
+    "✅ Natijalar online yuboriladi\n\n"
+    "Analiz vaqtida ichni yumshatuvchi dorilarni qabul qilish mumkin\n\n"
+    "Namunani:\n"
+    "☀️ quyosh tushmaydigan qorong'i joyda\n"
+    "👶 bolalar qo'li yetmaydigan joyda saqlash kerak.\n\n"
+    "<b>NMED HOME LAB</b>\n"
+    "\"Sog'liq — taxmin bilan emas, aniq tekshiruv bilan boshlanadi.\""
+)
+
+# Video tagidagi "Matn ko'rinishi" tugmasi (til bo'yicha).
+INTRO_TEXT_BTN = {
+    "uz": "📄 Matn ko'rinishi",
+    "ru": "📄 Текстовый вариант",
+    "en": "📄 Text version",
+}
+
+
+def _read_cached_file_id() -> str | None:
+    try:
+        with open(INTRO_VIDEO_FILEID_CACHE, "r", encoding="utf-8") as f:
+            fid = f.read().strip()
+            return fid or None
+    except Exception:
+        return None
+
+
+def _write_cached_file_id(file_id: str) -> None:
+    try:
+        with open(INTRO_VIDEO_FILEID_CACHE, "w", encoding="utf-8") as f:
+            f.write(file_id)
+    except Exception:
+        pass
+
+
+async def send_intro_video(context, chat_id: int, lang: str) -> None:
+    """Welcome xabardan oldin tanishtiruv videosini yuboradi.
+
+    Video tagida «Matn ko'rinishi» inline tugmasi bo'ladi — bosilganda
+    videoning matnli varianti chiqadi. Telegram file_id keshlanadi, shuning
+    uchun video faqat bir marta yuklanadi, keyin tezda qayta ishlatiladi.
+    """
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton(
+            INTRO_TEXT_BTN.get(lang, INTRO_TEXT_BTN["uz"]),
+            callback_data="intro_video_text",
+        )
+    ]])
+
+    cached_id = _read_cached_file_id()
+    if cached_id:
+        try:
+            await context.bot.send_video(
+                chat_id=chat_id,
+                video=cached_id,
+                reply_markup=keyboard,
+                supports_streaming=True,
+                read_timeout=60,
+                write_timeout=60,
+                connect_timeout=30,
+            )
+            return
+        except Exception as exc:
+            logger.warning("Intro video file_id eskirgan, qayta yuklanadi: %s", exc)
+
+    if not os.path.exists(INTRO_VIDEO_PATH):
+        logger.error("Intro video topilmadi: %s", INTRO_VIDEO_PATH)
+        return
+
+    # Birinchi yuklash: video faylni Telegramga yuklaymiz. Fayl uploadi default
+    # write_timeout (≈5s) dan uzunroq bo'lishi mumkin — shu sabab timeoutlarni
+    # oshiramiz, aks holda upload "Timed out" bo'lib file_id keshlanmaydi.
+    try:
+        with open(INTRO_VIDEO_PATH, "rb") as vf:
+            message = await context.bot.send_video(
+                chat_id=chat_id,
+                video=vf,
+                reply_markup=keyboard,
+                supports_streaming=True,
+                read_timeout=180,
+                write_timeout=180,
+                connect_timeout=60,
+            )
+        if message and message.video:
+            _write_cached_file_id(message.video.file_id)
+            logger.info("Intro video file_id keshlandi: %s", message.video.file_id)
+    except Exception as exc:
+        logger.error("Intro videoni yuborishda xatolik: %s", exc)
+
+
+async def intro_video_text_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Video tagidagi «Matn ko'rinishi» tugmasi.
+
+    Matn alohida xabar bo'lib emas, o'sha videoning captioniga edit qilib
+    yoziladi. Caption ≈750 belgi — Telegram limiti (1024) ichida.
+    Tugma bosilgach olib tashlanadi (matn ko'rsatildi).
+    """
+    query = update.callback_query
+    try:
+        await query.answer()
+    except Exception:
+        pass
+    try:
+        await query.edit_message_caption(
+            caption=INTRO_VIDEO_TEXT,
+            parse_mode="html",
+        )
+    except Exception as exc:
+        logger.error("Intro video caption edit xatolik: %s", exc)
+        # Zaxira yo'l: agar caption edit ishlamasa, alohida xabar yuboramiz.
+        try:
+            await query.message.reply_text(INTRO_VIDEO_TEXT, parse_mode="html")
+        except Exception:
+            pass
 
 # ─── TRANSLATIONS ──────────────────────────────────────────────────────────────
 MESSAGES = {
@@ -307,6 +452,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_language_picker(update, context)
         return ConversationHandler.END
 
+    # ── 3c. Keyingi /start — foydalanuvchi avval tanlagan til saqlanadi ───────────
+    #   (Telegram interfeys tiliga qarab avtomatik o'zgartirilmaydi.)
     lang = _clean_lang(user_lang)
     
     # ── 4. Admin uchun maxsus tizim xabari (eski bot bilan bir xil) ──────────────
@@ -371,6 +518,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_admin=is_admin,
         user_id=tg_user.id,
     )
+
+    # ── 6a. Welcome xabardan oldin tanishtiruv videosini yuborish ────────────────
+    await send_intro_video(context, tg_user.id, lang)
 
     welcome_text = MESSAGES["welcome"].get(lang, MESSAGES["welcome"]["uz"])
 

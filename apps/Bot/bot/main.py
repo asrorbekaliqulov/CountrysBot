@@ -1,10 +1,10 @@
-from apps.Bot.BotCommands.StartCommand import main_menu_callback, set_lang_callback
+from apps.Bot.BotCommands.StartCommand import main_menu_callback, set_lang_callback, intro_video_text_callback
 
 from ..MandatoryChannel import AddChannel_ConvHandler, MandatoryChannelOrGroupList, start_delete_mandatory, delete_mandatory
 from ..BotCommands import start
 from ..BotAdmin import admin_menyu, add_admin_handler, the_first_admin, remove_admin_handler, AdminList
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-from ..BotHandler import send_msg_handler, bot_stats, InlineButton, guide, guide_create_conv, guide_update_conv, guide_delete_conv, AdminGuide, appeal_conv, list_appeals, show_appeal_detail, handle_admin_reply, all_appeals, handle_results, handle_profile, handle_order_status
+from ..BotHandler import send_msg_handler, bot_stats, InlineButton, guide, guide_create_conv, guide_update_conv, guide_delete_conv, AdminGuide, appeal_conv, list_appeals, show_appeal_detail, handle_admin_reply, all_appeals, handle_results, handle_profile, handle_order_status, feedback_conv_handler, feedback_start
 from datetime import datetime, timedelta
 from ..BotCommands.DownDB import DownlBD
 import random
@@ -42,6 +42,7 @@ def main():
     app.add_handler(guide_update_conv)
     app.add_handler(guide_delete_conv)
     app.add_handler(appeal_conv)
+    app.add_handler(feedback_conv_handler)
 
 
 
@@ -64,13 +65,18 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_order_status, pattern=r"^order_status$"))
     app.add_handler(CallbackQueryHandler(handle_results, pattern=r"^my_results$"))
     app.add_handler(CallbackQueryHandler(handle_profile, pattern=r"^my_profile$"))
-    app.add_handler(CallbackQueryHandler(InlineButton))
 
     app.add_handler(CallbackQueryHandler(set_lang_callback, pattern=r"^set_lang:(uz|ru|en)$"))
+    app.add_handler(CallbackQueryHandler(intro_video_text_callback, pattern=r"^intro_video_text$"))
     app.add_handler(CallbackQueryHandler(
         main_menu_callback,
         pattern="^(feedback|contact_us|appeal|admin_panel|back_to_menu)$"
     ))
+    app.add_handler(CallbackQueryHandler(feedback_start, pattern="^feedback$"))
+
+    # Catch-all — barcha aniq pattern handlerlardan keyin turishi shart
+    app.add_handler(CallbackQueryHandler(InlineButton))
+
     # Message handlers
     app.add_handler(MessageHandler(filters.TEXT & filters.REPLY, handle_admin_reply))
 

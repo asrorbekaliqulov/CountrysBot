@@ -4,6 +4,7 @@ from rest_framework import serializers
 from apps.Bot.models.bot import Region, District, BotSetting
 from apps.Bot.models.TelegramBot import TelegramUser, Channel, Referral, Guide, Appeal
 from apps.Bot.models.orders import Service, Order, Payment
+from apps.Bot.models.feedback import Feedback
 
 # --- Bot Settings & Regions ---
 class BotSettingSerializer(serializers.ModelSerializer):
@@ -65,6 +66,21 @@ class AppealSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appeal
         fields = '__all__'
+
+class FeedbackSerializer(serializers.ModelSerializer):
+    user_details = TelegramUserSerializer(source='user', read_only=True)
+    rating_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Feedback
+        fields = '__all__'
+        read_only_fields = ['created_at']
+
+    def get_rating_display(self, obj):
+        if obj.rating:
+            stars = '⭐' * obj.rating
+            return f"{stars} ({obj.rating}/5)"
+        return "Baholanmagan"
 
 # --- Kuryer va Buyurtmalar Tizimi ---
 class CourierOrderSerializer(serializers.ModelSerializer):

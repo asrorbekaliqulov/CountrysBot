@@ -18,12 +18,14 @@ from apps.Bot.views.webapp_user import (
     webapp_order_detail_api,
     webapp_results_api,
     webapp_appeal_api,
+    webapp_feedback_api,
+    webapp_trust_api,
 )
 from apps.Bot.views.base import (
     # ViewSets
     OrderViewSet, RegionViewSet, DistrictViewSet, BotSettingViewSet,
     ServiceViewSet, TelegramUserViewSet, ChannelViewSet, ReferralViewSet,
-    GuideViewSet, AppealViewSet,
+    GuideViewSet, AppealViewSet, FeedbackViewSet,
     # APIView
     StaffMeAPIView,
     # Function views
@@ -61,6 +63,7 @@ router.register(r'channels',  ChannelViewSet,      basename='channel')
 router.register(r'referrals', ReferralViewSet,     basename='referral')
 router.register(r'guides',    GuideViewSet,        basename='guide')
 router.register(r'appeals',   AppealViewSet,       basename='appeal')
+router.register(r'feedbacks', FeedbackViewSet,     basename='feedback')
 router.register(r'services',  ServiceViewSet,      basename='services-list-api')
 
 # ⚠️ OrderViewSet router orqali EMAS — chunki create_order_with_payment
@@ -93,6 +96,8 @@ urlpatterns = [
     path('webapp/orders/<int:order_id>/', webapp_order_detail_api, name='webapp-order-detail'),
     path('webapp/results/', webapp_results_api, name='webapp-results'),
     path('webapp/appeal/', webapp_appeal_api, name='webapp-appeal'),
+    path('webapp/feedback/', webapp_feedback_api, name='webapp-feedback'),
+    path('webapp/trust/', webapp_trust_api, name='webapp-trust'),
 
     # ── Admin Panel ───────────────────────────────────────────────────────────
     path('admin-panel/',     admin_panel_view,     name='admin_panel'),

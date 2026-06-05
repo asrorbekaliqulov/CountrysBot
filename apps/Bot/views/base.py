@@ -34,12 +34,14 @@ from rest_framework.views import APIView
 
 from apps.Bot.models.bot import Region, District, BotSetting
 from apps.Bot.models.TelegramBot import TelegramUser, Channel, Referral, Guide, Appeal
+from apps.Bot.models.feedback import Feedback
 from apps.Bot.models.orders import Service, Order, Payment, TestResult
 from apps.Bot.serializers.base import (
     RegionSerializer, DistrictSerializer, BotSettingSerializer,
     TelegramUserSerializer, ChannelSerializer, ReferralSerializer,
     GuideSerializer, AppealSerializer, CourierOrderSerializer,
     ServiceSerializer, OrderCreateSerializer, PaymentSerializer,
+    FeedbackSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -122,6 +124,33 @@ class AppealViewSet(viewsets.ModelViewSet):
         appeal.status = True
         appeal.save()
         return Response({'status': 'Murojaat yopildi va javob berildi'})
+
+
+class FeedbackViewSet(viewsets.ModelViewSet):
+    queryset = Feedback.objects.all()
+    serializer_class = FeedbackSerializer
+    filterset_fields = ['rating', 'is_suggestion_only']
+    search_fields = ['text']
+
+    def perform_create(self, serializer):
+        tg_id = self.request.data.get('tg_id')
+        if tg_id:
+            try:
+                user = TelegramUser.objects.get(user_id=tg_id)
+                serializer.save(user=user)
+            except TelegramUser.DoesNotExist:
+                serializer.save()
+        else:
+            serializer.save()
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Umumiy statistika: o'rtacha baholash va baholagan foydalanuvchilar soni"""
+        avg_rating, user_count = Feedback.get_average_rating()
+        return Response({
+            'average_rating': avg_rating,
+            'total_users_rated': user_count,
+        })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
