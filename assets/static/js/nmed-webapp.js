@@ -206,6 +206,8 @@
     if (name === 'orders') loadOrders();
     if (name === 'results') loadResults();
     if (name === 'profile') loadProfile();
+    if (name === 'feedback') { initFeedback(); applyI18n(); }
+    if (name === 'trust') { loadTrustText(); initModals(); applyI18n(); }
     if (name === 'order-detail') { /* filled by openOrder */ }
     if (name === 'wizard' && !wizardSuccessMode) updateWizardUI();
   }
@@ -1277,5 +1279,397 @@
       return;
     }
     alertError(outcome.detail || tr('error'));
+  }
+
+  // Load trust text based on language
+  function loadTrustText() {
+    const trustTextContent = document.getElementById('trustTextContent');
+    if (!trustTextContent) return;
+
+    const trustTexts = {
+      uz: `
+        <h3>🛡️ ISHONCH VA KAFOLAT</h3>
+        <p>Hurmatli mijoz,</p>
+        <p>NMED HOME LAB xizmatidan foydalanayotganingiz uchun minnatdorchilik bildiramiz.</p>
+        <p>Biz uchun eng muhim qadriyat — Sizning ishonchingiz.</p>
+        <p>Shu sababli xizmatimizning har bir bosqichi shaffof, nazorat ostida va professional standartlar asosida tashkil etilgan.</p>
+        <h4>📄 Rasmiy hamkorlik</h4>
+        <p>NMED HOME LAB Parazitologiya yo'nalishida faoliyat yurituvchi mutaxassislar bilan hamkorlik qiladi.</p>
+        <h4>🔬 Professional tekshiruv</h4>
+        <p>Taqdim etilgan namunalar laboratoriya mutaxassislari tomonidan amaldagi standartlar asosida tekshiriladi.</p>
+        <h4>🚚 Namunalarni xavfsiz tashish</h4>
+        <p>Biologik namunalar maxsus maxsus konteynerlarda qabul qilinadi va laboratoriyaga yetkaziladi.</p>
+        <h4>📊 Natijalar</h4>
+        <p>Tekshiruv natijalari elektron shaklda taqdim etiladi.</p>
+        <h4>🔒 Maxfiylik</h4>
+        <p>Sizning shaxsiy ma'lumotlaringiz va tahlil natijalaringiz uchinchi shaxslarga taqdim etilmaydi.</p>
+        <h4>💳 Rasmiy to'lov</h4>
+        <p>To'lovlar faqat rasmiy elektron to'lov tizimlari orqali qabul qilinadi.</p>
+        <h4>👨‍⚕️ Mutaxassis nazorati</h4>
+        <p>Har bir buyurtma qabul qilinganidan boshlab natija tayor bo'lgunga qadar nazorat qilinadi.</p>
+        <h4>⭐ Nima uchun NMED HOME LAB?</h4>
+        <ul>
+          <li>✅ Uydan chiqmasdan buyurtma berish imkoniyati</li>
+          <li>✅ Vaqtingizni tejaydi</li>
+          <li>✅ Maxsus konteynerlar</li>
+          <li>✅ Professional laboratoriya tekshiruvi</li>
+          <li>✅ Natijalarni online olish imkoniyati</li>
+          <li>✅ Mijoz ma'lumotlarining maxfiyligi</li>
+          <li>✅ Qulay va zamonaviy xizmat</li>
+        </ul>
+        <p>Bizning maqsadimiz — taxmin emas, aniqlikka asoslangan tibbiy xizmat ko'rsatish.</p>
+        <p style="margin-top: 30px; font-size: 18px; font-weight: 600;">🖤 NMED HOME LAB</p>
+        <p style="font-style: italic;">"Sog'liq — aniqlikdan boshlanadi"</p>
+        <p style="margin-top: 10px;">974226167</p>
+      `,
+      ru: `
+        <h3>🛡️ ДОВЕРИЕ И ГАРАНТИЯ</h3>
+        <p>Уважаемый клиент,</p>
+        <p>Благодарим вас за использование сервиса NMED HOME LAB.</p>
+        <p>Для нас самая важная ценность — ваше доверие.</p>
+        <p>Поэтому каждый этап нашего сервиса организован прозрачно, под контролем и на основе профессиональных стандартов.</p>
+        <h4>📄 Официальное сотрудничество</h4>
+        <p>NMED HOME LAB сотрудничает со специалистами, работающими в направлении паразитологии.</p>
+        <h4>🔬 Профессиональное исследование</h4>
+        <p>Представленные образцы проверяются специалистами лаборатории в соответствии с действующими стандартами.</p>
+        <h4>🚚 Безопасная транспортировка образцов</h4>
+        <p>Биологические образцы принимаются в специальных контейнерах и доставляются в лабораторию.</p>
+        <h4>📊 Результаты</h4>
+        <p>Результаты исследования предоставляются в электронном виде.</p>
+        <h4>🔒 Конфиденциальность</h4>
+        <p>Ваши личные данные и результаты анализов не передаются третьим лицам.</p>
+        <h4>💳 Официальная оплата</h4>
+        <p>Оплаты принимаются только через официальные системы электронных платежей.</p>
+        <h4>👨‍⚕️ Контроль специалистов</h4>
+        <p>Каждый заказ контролируется с момента принятия до готовности результата.</p>
+        <h4>⭐ Почему NMED HOME LAB?</h4>
+        <ul>
+          <li>✅ Возможность заказа без выхода из дома</li>
+          <li>✅ Экономит ваше время</li>
+          <li>✅ Специальные контейнеры</li>
+          <li>✅ Профессиональное лабораторное исследование</li>
+          <li>✅ Возможность получения результатов онлайн</li>
+          <li>✅ Конфиденциальность данных клиентов</li>
+          <li>✅ Удобный и современный сервис</li>
+        </ul>
+        <p>Наша цель — предоставление медицинских услуг, основанных не на догадках, а на точности.</p>
+        <p style="margin-top: 30px; font-size: 18px; font-weight: 600;">🖤 NMED HOME LAB</p>
+        <p style="font-style: italic;">"Здоровье начинается с точности"</p>
+        <p style="margin-top: 10px;">974226167</p>
+      `,
+      en: `
+        <h3>🛡️ TRUST AND GUARANTEE</h3>
+        <p>Dear customer,</p>
+        <p>Thank you for using NMED HOME LAB service.</p>
+        <p>For us, the most important value is your trust.</p>
+        <p>Therefore, every stage of our service is organized transparently, under control and based on professional standards.</p>
+        <h4>📄 Official partnership</h4>
+        <p>NMED HOME LAB collaborates with specialists working in the field of parasitology.</p>
+        <h4>🔬 Professional examination</h4>
+        <p>Submitted samples are examined by laboratory specialists in accordance with current standards.</p>
+        <h4>🚚 Safe sample transportation</h4>
+        <p>Biological samples are accepted in special containers and delivered to the laboratory.</p>
+        <h4>📊 Results</h4>
+        <p>Examination results are provided in electronic form.</p>
+        <h4>🔒 Confidentiality</h4>
+        <p>Your personal data and analysis results are not disclosed to third parties.</p>
+        <h4>💳 Official payment</h4>
+        <p>Payments are accepted only through official electronic payment systems.</p>
+        <h4>👨‍⚕️ Specialist control</h4>
+        <p>Each order is controlled from acceptance to result readiness.</p>
+        <h4>⭐ Why NMED HOME LAB?</h4>
+        <ul>
+          <li>✅ Order without leaving home</li>
+          <li>✅ Saves your time</li>
+          <li>✅ Special containers</li>
+          <li>✅ Professional laboratory examination</li>
+          <li>✅ Online results access</li>
+          <li>✅ Customer data confidentiality</li>
+          <li>✅ Convenient and modern service</li>
+        </ul>
+        <p>Our goal is to provide medical services based not on assumptions, but on accuracy.</p>
+        <p style="margin-top: 30px; font-size: 18px; font-weight: 600;">🖤 NMED HOME LAB</p>
+        <p style="font-style: italic;">"Health starts with accuracy"</p>
+        <p style="margin-top: 10px;">974226167</p>
+      `
+    };
+
+    trustTextContent.innerHTML = trustTexts[currentLang] || trustTexts.uz;
+  }
+
+  // Modal functionality for trust documents
+  function initModals() {
+    const pdfModal = document.getElementById('pdfModal');
+    const textModal = document.getElementById('textModal');
+    const btnViewPdf = document.getElementById('btnViewPdf');
+    const btnViewText = document.getElementById('btnViewText');
+    const btnViewCertificate = document.getElementById('btnViewCertificate');
+    const pdfModalClose = document.getElementById('pdfModalClose');
+    const textModalClose = document.getElementById('textModalClose');
+    const textContent = document.getElementById('textContent');
+
+    // PDF Modal
+    if (btnViewPdf && pdfModal) {
+      btnViewPdf.addEventListener('click', () => {
+        pdfModal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      });
+    }
+
+    if (pdfModalClose && pdfModal) {
+      pdfModalClose.addEventListener('click', () => {
+        pdfModal.classList.add('hidden');
+        document.body.style.overflow = '';
+      });
+    }
+
+    // Certificate Modal (open image in new tab)
+    if (btnViewCertificate) {
+      btnViewCertificate.addEventListener('click', () => {
+        window.open('{% static "media/certificate.jpg" %}', '_blank');
+      });
+    }
+
+    // Certificate text section
+    const certificateTextSection = document.getElementById('certificateTextSection');
+    if (certificateTextSection) {
+      const certificateTexts = {
+        uz: 'NMED HOME LAB - Parazitologiya yo\'nalishida rasmiy sertifikatga ega tibbiy laboratoriya.',
+        ru: 'NMED HOME LAB - Медицинская лаборатория с официальным сертификатом в направлении паразитологии.',
+        en: 'NMED HOME LAB - Medical laboratory with official certification in parasitology.'
+      };
+      certificateTextSection.textContent = certificateTexts[currentLang] || certificateTexts.uz;
+    } else {
+      console.error('certificateTextSection not found');
+    }
+
+    // Text Modal
+    if (btnViewText && textModal) {
+      btnViewText.addEventListener('click', async () => {
+        textModal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        
+        // Load text.txt content
+        try {
+          const response = await fetch('{% static "media/text.txt" %}');
+          if (response.ok) {
+            const text = await response.text();
+            if (textContent) {
+              textContent.textContent = text;
+            }
+          } else {
+            if (textContent) {
+              textContent.textContent = 'Xatolik yuz berdi. Keyinroq urinib ko\'ring.';
+            }
+          }
+        } catch (error) {
+          console.error('Error loading text.txt:', error);
+          if (textContent) {
+            textContent.textContent = 'Xatolik yuz berdi. Keyinroq urinib ko\'ring.';
+          }
+        }
+      });
+    }
+
+    if (textModalClose && textModal) {
+      textModalClose.addEventListener('click', () => {
+        textModal.classList.add('hidden');
+        document.body.style.overflow = '';
+      });
+    }
+
+    // Close modals when clicking outside
+    [pdfModal, textModal].forEach(modal => {
+      if (modal) {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+          }
+        });
+      }
+    });
+  }
+
+  // Initialize modals on page load
+  initModals();
+
+  // Feedback functionality
+  function initFeedback() {
+    const btnRateBot = document.getElementById('btnRateBot');
+    const btnSendSuggestion = document.getElementById('btnSendSuggestion');
+    const ratingSection = document.getElementById('ratingSection');
+    const suggestionSection = document.getElementById('suggestionSection');
+    const ratingStars = document.getElementById('ratingStars');
+    const btnSubmitRating = document.getElementById('btnSubmitRating');
+    const btnSubmitSuggestion = document.getElementById('btnSubmitSuggestion');
+    const ratingText = document.getElementById('ratingText');
+    const suggestionText = document.getElementById('suggestionText');
+
+    let selectedRating = null;
+
+    // Apply translations to buttons immediately
+    if (btnRateBot) {
+      btnRateBot.textContent = tr('rate_bot');
+    }
+    if (btnSendSuggestion) {
+      btnSendSuggestion.textContent = tr('send_suggestion');
+    }
+
+    // Show rating section
+    if (btnRateBot) {
+      btnRateBot.addEventListener('click', () => {
+        ratingSection.classList.remove('hidden');
+        suggestionSection.classList.add('hidden');
+        btnRateBot.classList.add('selected');
+        btnSendSuggestion.classList.remove('selected');
+        applyI18n();
+      });
+    }
+
+    // Show suggestion section
+    if (btnSendSuggestion) {
+      btnSendSuggestion.addEventListener('click', () => {
+        suggestionSection.classList.remove('hidden');
+        ratingSection.classList.add('hidden');
+        btnSendSuggestion.classList.add('selected');
+        btnRateBot.classList.remove('selected');
+        applyI18n();
+      });
+    }
+
+    // Star rating selection
+    if (ratingStars) {
+      const starButtons = ratingStars.querySelectorAll('.star-btn');
+      starButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const rating = parseInt(btn.dataset.rating);
+          selectedRating = rating;
+          
+          // Update visual selection (App Store style - all stars up to selected become active)
+          starButtons.forEach((starBtn, index) => {
+            if (index < rating) {
+              starBtn.classList.add('active');
+            } else {
+              starBtn.classList.remove('active');
+            }
+          });
+
+          // Update placeholder text based on rating
+          updateRatingPlaceholder(rating);
+        });
+      });
+    }
+
+    // Function to update placeholder based on rating
+    function updateRatingPlaceholder(rating) {
+      if (!ratingText) return;
+      
+      let placeholder = '';
+      if (rating <= 2) {
+        placeholder = currentLang === 'uz' ? 'Sizga nima manzur kelmadi? Muammoni so\'rang' :
+                   currentLang === 'ru' ? 'Что вам не понравилось? Опишите проблему' :
+                   'What didn\'t you like? Please describe the issue';
+      } else if (rating === 3) {
+        placeholder = currentLang === 'uz' ? 'Yana nimalar qo\'shishimiz mumkin?' :
+                   currentLang === 'ru' ? 'Что мы можем улучшить?' :
+                   'What can we improve?';
+      } else {
+        placeholder = currentLang === 'uz' ? 'Aynan nima sizga yoqdi?' :
+                   currentLang === 'ru' ? 'Что именно вам понравилось?' :
+                   'What did you like specifically?';
+      }
+      
+      ratingText.placeholder = placeholder;
+    }
+
+    // Submit rating
+    if (btnSubmitRating) {
+      btnSubmitRating.textContent = tr('send');
+      btnSubmitRating.addEventListener('click', async () => {
+        if (!selectedRating) {
+          alertError('Iltimos, baholang');
+          return;
+        }
+
+        const comment = ratingText ? ratingText.value.trim() : '';
+        
+        try {
+          const response = await fetch('/api/webapp/feedback/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              rating: selectedRating,
+              text: comment,
+              is_suggestion_only: false,
+              tg_id: tgId
+            })
+          });
+
+          // Check if response is OK (status 200-299)
+          if (response.ok) {
+            const data = await response.json();
+            // Even if data.success is false, if response.ok is true, it was saved
+            alertSuccess('Rahmat! Fikringiz qabul qilindi');
+            ratingText.value = '';
+            selectedRating = null;
+            ratingStars.querySelectorAll('.star-btn').forEach(btn => btn.classList.remove('active'));
+            showScreen('home');
+          } else {
+            // Only show error if HTTP status indicates failure
+            try {
+              const data = await response.json();
+              alertError(data.error || data.detail || 'Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+            } catch (e) {
+              alertError('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+            }
+          }
+        } catch (error) {
+          console.error('Error submitting rating:', error);
+          alertError('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+        }
+      });
+    }
+
+    // Submit suggestion
+    if (btnSubmitSuggestion) {
+      btnSubmitSuggestion.textContent = tr('send');
+      btnSubmitSuggestion.addEventListener('click', async () => {
+        const text = suggestionText ? suggestionText.value.trim() : '';
+        
+        if (!text) {
+          alertError('Iltimos, taklif yozing');
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/webapp/feedback/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              rating: null,
+              text: text,
+              is_suggestion_only: true,
+              tg_id: tgId
+            })
+          });
+
+          if (response.ok) {
+            alertSuccess('Rahmat! Taklifingiz qabul qilindi');
+            suggestionText.value = '';
+            showScreen('home');
+          } else {
+            alertError('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+          }
+        } catch (error) {
+          console.error('Error submitting suggestion:', error);
+          alertError('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+        }
+      });
+    }
   }
 })();

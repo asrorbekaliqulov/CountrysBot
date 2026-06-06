@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="{% static 'css/nmed-webapp.css' %}?v=9">
+  <link rel="stylesheet" href="{% static 'css/nmed-webapp.css' %}?v=20">
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -30,34 +30,52 @@
   <!-- HOME -->
   <section id="screen-home" class="screen active home-screen">
     <div class="home-inner">
-      <div class="home-brand-center">
-        <div class="home-flask-wrap">
-          <div class="home-flask-icon"><i data-lucide="flask-conical"></i></div>
-        </div>
-        <div class="home-brand-name">
+      <div class="home-brand">
+        <img src="{% static 'img/nmed-logo.png' %}?v=20" alt="NMED HOME LAB" class="home-brand-logo" width="120" height="120">
+        <div class="home-brand-text">
           <span class="home-nmed">NMED</span>
           <span class="home-lab">HOME LAB</span>
         </div>
-        <span class="home-premium-badge" data-i18n="premium_badge">PREMIUM SERVICE</span>
+      </div>
+
+      <div class="home-premium-row">
+        <span class="home-premium-badge">
+          <i data-lucide="crown"></i>
+          <span data-i18n="premium_badge">PREMIUM HOME SERVICE</span>
+        </span>
       </div>
 
       <div class="home-hero">
-        <h1 data-i18n="home_title">Laboratoriya endi uyingizda</h1>
-        <p class="home-sub" data-i18n="home_subtitle">Aniqlik. Qulaylik. Ishonch.</p>
+        <h1 class="home-title" data-i18n="home_title">Laboratoriya endi uyingizda</h1>
+        <p class="home-sub">
+          <span data-i18n="home_sub1">Aniqlik</span>
+          <b class="hs-dot">·</b>
+          <span data-i18n="home_sub2">Qulaylik</span>
+          <b class="hs-dot">·</b>
+          <span data-i18n="home_sub3">Ishonch</span>
+        </p>
 
-        <ul class="home-features">
-          <li><span class="hf-icon"><i data-lucide="stethoscope"></i></span><span data-i18n="feat1">Professional mutaxassislar</span></li>
-          <li><span class="hf-icon"><i data-lucide="flask-conical"></i></span><span data-i18n="feat2">Maxsus steril konteyner</span></li>
-          <li><span class="hf-icon"><i data-lucide="building-2"></i></span><span data-i18n="feat3">Institut laboratoriyasida tekshiriladi</span></li>
-          <li><span class="hf-icon"><i data-lucide="smartphone"></i></span><span data-i18n="feat4">Natijalar online yuboriladi</span></li>
-          <li><span class="hf-icon"><i data-lucide="clock"></i></span><span data-i18n="feat5">Vaqtingiz tejaladi</span></li>
-        </ul>
-
-        <div class="home-product">
-          <img src="{% static 'img/nmed-product-hero.png' %}?v=8" alt="NMED home lab" class="home-product-img" width="719" height="347">
+        <div class="home-features-wrap">
+          <ul class="home-features">
+            <li><span class="hf-icon"><i data-lucide="landmark"></i></span><span class="hf-text"><span class="hf-title" data-i18n="feat1_t">Parazitologiya instituti</span><span class="hf-desc" data-i18n="feat1_d">laboratoriyasida tekshiriladi</span></span></li>
+            <li><span class="hf-icon"><i data-lucide="flask-conical"></i></span><span class="hf-text"><span class="hf-title" data-i18n="feat2_t">Maxsus steril konteyner</span><span class="hf-desc" data-i18n="feat2_d">Xavfsiz va gigiyenik</span></span></li>
+            <li><span class="hf-icon"><i data-lucide="file-text"></i></span><span class="hf-text"><span class="hf-title" data-i18n="feat3_t">Natijalar online yuboriladi</span><span class="hf-desc" data-i18n="feat3_d">Tezkor va ishonchli</span></span></li>
+            <li><span class="hf-icon"><i data-lucide="headphones"></i></span><span class="hf-text"><span class="hf-title" data-i18n="feat4_t">Operator kuzatuvi</span><span class="hf-desc" data-i18n="feat4_d">Savollaringizga 24/7 javob beramiz</span></span></li>
+            <li><span class="hf-icon"><i data-lucide="clock"></i></span><span class="hf-text"><span class="hf-title" data-i18n="feat5_t">Vaqtingiz tejaladi</span><span class="hf-desc" data-i18n="feat5_d">Biz siz uchun ishlaymiz</span></span></li>
+          </ul>
+          <img src="{% static 'img/nmed-product-hero.png' %}?v=8" alt="" class="home-product-float" aria-hidden="true">
         </div>
 
-        <button type="button" class="btn-cta" id="btnOrderMain" data-i18n="order_btn">Tahlil buyurtma qilish →</button>
+        <button type="button" class="btn-cta btn-cta-indigo" id="btnOrderMain">
+          <span data-i18n="order_btn">Tahlil buyurtma qilish</span>
+          <span class="btn-cta-arrow"><i data-lucide="arrow-right"></i></span>
+        </button>
+
+        <div class="home-hero-trust">
+          <span><i data-lucide="shield-check"></i><small data-i18n="ht_secure">100% ishonchli xizmat</small></span>
+          <span><i data-lucide="award"></i><small data-i18n="ht_official">Rasmiy laboratoriya</small></span>
+          <span><i data-lucide="lock"></i><small data-i18n="ht_pay">Xavfsiz to'lov</small></span>
+        </div>
       </div>
 
       <nav class="home-nav">
@@ -81,19 +99,18 @@
         </div>
       </div>
 
-      <div class="home-trust-bar">
-        <span><span class="inc-ic"><i data-lucide="shield-check"></i></span><small data-i18n="ft_trust1">100% ishonchli</small></span>
-        <span><span class="inc-ic"><i data-lucide="building-2"></i></span><small data-i18n="ft_trust2">Rasmiy laboratoriya</small></span>
-        <span><span class="inc-ic"><i data-lucide="smartphone"></i></span><small data-i18n="ft_trust3">Onlayn natija</small></span>
-        <span><span class="inc-ic"><i data-lucide="zap"></i></span><small data-i18n="ft_trust4">Tezkor xizmat</small></span>
-        <span><span class="inc-ic"><i data-lucide="award"></i></span><small data-i18n="ft_trust5">Sertifikat</small></span>
-      </div>
       <div class="home-copy">© NMED HOME LAB</div>
     </div>
   </section>
 
   <!-- WIZARD -->
   <section id="screen-wizard" class="screen">
+    <button type="button" class="wiz-help-btn" id="wizHelpBtn" aria-label="Yordam" title="Yordam">
+      <i data-lucide="help-circle"></i>
+      <span class="wiz-help-dot" aria-hidden="true"></span>
+    </button>
+    <div class="wiz-help-hint hidden" id="wizHelpHint" role="status"><span class="wiz-help-hint-text"></span></div>
+    <div class="wiz-help-spotlight hidden" id="wizHelpSpot" aria-hidden="true"></div>
     <div class="wizard-body" id="wizardBody">
       {% csrf_token %}
       <div class="wizard-progress">
@@ -103,13 +120,14 @@
       </div>
 
       <div class="wizard-step active" data-step="1">
-        <h2 data-i18n="wiz1_title">Tahlil turini tanlang</h2>
-        <p class="sub" data-i18n="wiz1_sub">Sizga mos tahlilni belgilang</p>
-        <div id="servicesList"></div>
-        <div class="step1-info-row">
-          <div class="info-mini-block"><span class="imb-ic"><i data-lucide="clock"></i></span><span data-i18n="wiz1_result_24h">Natija 24 soat ichida</span></div>
-          <div class="info-mini-block"><span class="imb-ic"><i data-lucide="badge-check"></i></span><span data-i18n="wiz1_accuracy">100% aniqlik</span></div>
+        <div class="wiz1-head">
+          <div class="wiz1-head-text">
+            <h2 data-i18n="wiz1_title">Tahlil turini tanlang</h2>
+            <p class="sub" data-i18n="wiz1_sub">Sizga mos tahlilni belgilang</p>
+          </div>
+          <span class="wiz1-head-ic" aria-hidden="true"><img src="{% static 'img/nmed-step1-icon.png' %}?v=20" alt=""></span>
         </div>
+        <div id="servicesList"></div>
       </div>
 
       <div class="wizard-step" data-step="2">
@@ -155,7 +173,7 @@
       </div>
 
       <div class="wizard-step" data-step="6">
-        <h2 data-i18n="wiz6_title">Yetkazish vaqti</h2>
+        <h2 data-i18n="wiz6_title">Konteynerni (nabor) uyingizga yetkazib berish vaqtimiz</h2>
         <p class="sub" data-i18n="wiz6_sub">Yetkazish faqat kechqurun — 18:00 dan 22:00 gacha</p>
         <div id="slotsBox" class="slot-grid"></div>
       </div>
@@ -206,6 +224,7 @@
           <div class="summary-row"><span data-i18n="sum_patient">Bemor</span><b id="summaryPatient">—</b></div>
           <div class="summary-row"><span data-i18n="sum_time">Vaqt</span><b id="summaryTime">—</b></div>
           <div class="summary-row"><span data-i18n="sum_delivery">Yetkazish</span><b id="summaryDelivery">—</b></div>
+          <div class="summary-divider"><span data-i18n="sum_total_label">Umumiy xizmat narxi</span></div>
           <div class="summary-row summary-total"><span data-i18n="sum_total">Jami</span><b id="summaryTotal">—</b></div>
         </div>
         <textarea class="input-field input-lg" id="extraComplaint" rows="2" data-i18n-ph="ph_extra_complaint" placeholder="Qo'shimcha shikoyat (ixtiyoriy)"></textarea>
@@ -239,6 +258,16 @@
     </div>
     <footer class="wizard-footer">
       <button type="button" class="btn-cta" id="wizardNextBtn" data-i18n="continue">Davom etish →</button>
+      <div class="wiz-foot-extra hidden" id="wizFootExtra">
+        <div class="step1-feat-strip">
+          <span><i data-lucide="shield-check"></i><small data-i18n="s1f_secure">100% ishonchli xizmat</small></span>
+          <span><i data-lucide="landmark"></i><small data-i18n="s1f_institute">Parazitologiya institutida tekshiriladi</small></span>
+          <span><i data-lucide="flask-conical"></i><small data-i18n="s1f_container">Maxsus steril konteyner</small></span>
+          <span><i data-lucide="file-text"></i><small data-i18n="s1f_online">Natijalar online yuboriladi</small></span>
+          <span><i data-lucide="clock"></i><small data-i18n="s1f_time">Vaqtingiz tejaladi</small></span>
+        </div>
+        <div class="wiz-secure-note"><i data-lucide="lock"></i><span data-i18n="s1_secure_note">Sizning ma'lumotlaringiz maxfiy va himoyalangan</span></div>
+      </div>
     </footer>
   </section>
 
@@ -269,20 +298,80 @@
     <div class="page-light">
       <h2 class="page-title" data-i18n="feedback_title">⭐️ Fikr & taklif</h2>
       <p class="page-sub" data-i18n="feedback_sub">Fikringiz biz uchun muhim</p>
-      <textarea class="input-field input-lg" id="appealText" rows="5" data-i18n-ph="ph_appeal" placeholder="Xabaringizni yozing..."></textarea>
-      <button type="button" class="btn-cta" id="btnAppealSend" data-i18n="send">Yuborish</button>
+      
+      <div class="feedback-type-selector">
+        <button type="button" class="choice-block choice-block-lg" id="btnRateBot" data-i18n="rate_bot">⭐ Botni baholash</button>
+        <button type="button" class="choice-block choice-block-lg" id="btnSendSuggestion" data-i18n="send_suggestion">📝 Taklif yozish</button>
+      </div>
+
+      <div id="ratingSection" class="hidden">
+        <h3 data-i18n="rating_title">Botni baholang</h3>
+        <div class="rating-stars" id="ratingStars">
+          <button type="button" class="star-btn" data-rating="1">★</button>
+          <button type="button" class="star-btn" data-rating="2">★</button>
+          <button type="button" class="star-btn" data-rating="3">★</button>
+          <button type="button" class="star-btn" data-rating="4">★</button>
+          <button type="button" class="star-btn" data-rating="5">★</button>
+        </div>
+        <textarea class="input-field input-lg" id="ratingText" rows="3" data-i18n-ph="ph_rating_comment" placeholder="Qo'shimcha fikringiz (ixtiyoriy)"></textarea>
+        <button type="button" class="btn-cta" id="btnSubmitRating" data-i18n="submit">Yuborish</button>
+      </div>
+
+      <div id="suggestionSection" class="hidden">
+        <h3 data-i18n="suggestion_title">Taklifingizni yozing</h3>
+        <textarea class="input-field input-lg" id="suggestionText" rows="5" data-i18n-ph="ph_suggestion" placeholder="Taklifingizni yozing..."></textarea>
+        <button type="button" class="btn-cta" id="btnSubmitSuggestion" data-i18n="send">Yuborish</button>
+      </div>
     </div>
   </section>
 
   <section id="screen-trust" class="screen">
     <div class="page-light">
       <h2 class="page-title" data-i18n="trust_title">🛡️ Ishonch va kafolat</h2>
-      <div class="trust-card"><span>🏥</span><span data-i18n="trust1">Rasmiy laboratoriya hamkorligi</span></div>
-      <div class="trust-card"><span>👨‍⚕️</span><span data-i18n="trust2">Tajribali mutaxassislar</span></div>
-      <div class="trust-card"><span>🧫</span><span data-i18n="trust3">Steril konteyner va to'g'ri saqlash</span></div>
-      <div class="trust-card"><span>📜</span><span data-i18n="trust4">Xalqaro standartlarga moslik</span></div>
-      <div class="trust-card"><span>🔒</span><span data-i18n="trust5">100% mijoz ma'lumotlari himoyasi</span></div>
-      <div class="trust-card"><span>📱</span><span data-i18n="trust6">Onlayn natija va arxiv</span></div>
+      
+      <div class="trust-docs-section">
+        <a href="/media/shartnoma.pdf" download="shartnoma.pdf" class="btn-cta btn-lg" style="width: 100%; margin-bottom: 8px; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 10px;">
+          <span style="font-size: 24px;">📄</span>
+          <span data-i18n="trust_contract">Shartnoma (PDF)</span>
+        </a>
+        <p style="text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 16px 0; line-height: 1.4;" data-i18n="trust_contract_desc">Xizmat shartnomasi - yuklab olish uchun bosing</p>
+      </div>
+      
+      <div class="trust-text-section">
+        <div class="trust-text-content" id="trustTextContent">
+          <!-- Content will be loaded by JavaScript based on language -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PDF Viewer Modal -->
+  <div class="modal-overlay hidden" id="pdfModal" role="dialog" aria-modal="true">
+    <div class="modal-content pdf-modal">
+      <button type="button" class="modal-close" id="pdfModalClose" aria-label="Yopish">&times;</button>
+      <div class="modal-header">
+        <h3 data-i18n="trust_contract">Shartnoma</h3>
+        <a href="/media/shartnoma.pdf" download="shartnoma.pdf" class="btn-download">
+          <i data-lucide="download"></i>
+          <span data-i18n="download">Yuklab olish</span>
+        </a>
+      </div>
+      <div class="modal-body">
+        <iframe src="/static/media/shartnoma.pdf" class="pdf-viewer"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- Text Viewer Modal -->
+  <div class="modal-overlay hidden" id="textModal" role="dialog" aria-modal="true">
+    <div class="modal-content text-modal">
+      <button type="button" class="modal-close" id="textModalClose" aria-label="Yopish">&times;</button>
+      <div class="modal-header">
+        <h3 data-i18n="trust_info">Batafsil ma'lumot</h3>
+      </div>
+      <div class="modal-body">
+        <div class="text-content" id="textContent">Yuklanmoqda...</div>
+      </div>
     </div>
   </section>
 
@@ -296,9 +385,19 @@
       </div>
     </div>
   </section>
+
+  <!-- HELP MODAL (qadam bo'yicha tushuntirish) -->
+  <div class="help-modal-overlay hidden" id="helpModal" role="dialog" aria-modal="true">
+    <div class="help-modal">
+      <button type="button" class="help-modal-close" id="helpModalClose" aria-label="Yopish">&times;</button>
+      <div class="help-modal-icon"><i data-lucide="help-circle"></i></div>
+      <h3 class="help-modal-title" id="helpModalTitle"></h3>
+      <div class="help-modal-body" id="helpModalBody"></div>
+    </div>
+  </div>
 </div>
 
-<script src="{% static 'js/nmed-i18n.js' %}?v=9"></script>
-<script src="{% static 'js/nmed-webapp.js' %}?v=9"></script>
+<script src="{% static 'js/nmed-i18n.js' %}?v=21"></script>
+<script src="{% static 'js/nmed-webapp.js' %}?v=21"></script>
 </body>
 </html>
