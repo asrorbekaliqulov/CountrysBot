@@ -945,6 +945,9 @@ async function loadUsers(page = 1) {
   const el = document.getElementById('users-list-container');
   el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">Yuklanmoqda...</div>';
   
+  // Kuryerlar uchun tuman dropdownini to'ldirish uchun tumanlar kerak
+  if (!districtsData.length) districtsData = await api(`/api/districts/?tg_id=${TG_ID}`) || [];
+  
   const roleFilter = document.getElementById('user-role-filter').value;
   const search = document.getElementById('user-search').value.trim();
   
@@ -996,11 +999,19 @@ async function loadUsers(page = 1) {
     };
     
     const currentRole = u.role || 'user';
-    const roleBadge = roleBadges[currentRole] || roleBadges['user'];
     
-    let districtInfo = '—';
-    if (u.district_name) {
-      districtInfo = `<span class="badge badge-orange" style="font-size:10px">📍 ${esc(u.district_name)}</span>`;
+    // Tuman ustuni: kuryer bo'lsa — tanlash dropdowni, aks holda "—"
+    let districtCell = '<span class="text-muted">—</span>';
+    if (currentRole === 'courier') {
+      let opts = `<option value="">-- Tuman tanlang --</option>`;
+      districtsData.forEach(d => {
+        const dId = d.id;
+        const dName = d.name_uz || d.name;
+        const sel = (u.district_id === dId) ? 'selected' : '';
+        opts += `<option value="${dId}" ${sel}>${esc(dName)}</option>`;
+      });
+      const warn = u.district_id ? '' : 'style="border-color:var(--red);background:#fef2f2"';
+      districtCell = `<select class="select" id="dist-${u.id}" onchange="assignUserDistrict(${u.id})" ${warn} style="width:130px;padding:4px 6px;font-size:11px">${opts}</select>`;
     }
     
     const langMap = { uz: '🇺🇿 UZ', ru: '🇷🇺 RU', en: '🇬🇧 EN' };
@@ -1018,7 +1029,7 @@ async function loadUsers(page = 1) {
           <option value="doctor" ${currentRole==='doctor'?'selected':''}>🩺 Doctor</option>
         </select>
       </td>
-      <td>${districtInfo}</td>
+      <td>${districtCell}</td>
       <td><small>${langBadge}</small></td>
       <td><small class="text-muted">${u.date_joined}</small></td>
     </tr>`;
@@ -1047,11 +1058,49 @@ async function updateUserRole(userId) {
   });
   
   if (res && res.success) {
-    showToast(`✅ ${user.first_name} roli "${newRole}" ga o'zgartirildi!`);
+    if (newRole === 'courier') {
+      showToast(`✅ ${user.first_name} kuryer bo'ldi! Endi tuman biriktiring 📍`);
+    } else {
+      showToast(`✅ ${user.first_name} roli "${newRole}" ga o'zgartirildi!`);
+    }
     loadUsers(currentUsersPage); // Reload current page
   } else {
     alert('❌ ' + (res?.error || 'Xatolik yuz berdi'));
     selectEl.value = user.role || 'user';
+  }
+}
+
+async function assignUserDistrict(userId) {
+  const selectEl = document.getElementById(`dist-${userId}`);
+  const districtId = selectEl.value;
+  const user = usersData.find(u => u.id === userId);
+  if (!user) return;
+
+  if (!districtId) {
+    // Tumanni olib tashlash (bo'sh tanlandi)
+    if (!confirm(`${user.first_name} kuryeridan tuman biriktiruvini olib tashlaysizmi?`)) {
+      selectEl.value = user.district_id || '';
+      return;
+    }
+  }
+
+  const res = await api(`/api/admin/staff/assign-district/?tg_id=${TG_ID}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ courier_id: userId, district_id: districtId ? parseInt(districtId) : null })
+  });
+
+  if (res && res.success) {
+    const dName = res.courier?.district?.name;
+    showToast(dName ? `📍 ${user.first_name} → ${dName} tumaniga biriktirildi!` : `✅ Tuman biriktiruvi yangilandi!`);
+    // Lokal ma'lumotni yangilaymiz (qayta yuklamasdan)
+    user.district_id = districtId ? parseInt(districtId) : null;
+    user.district_name = dName || null;
+    selectEl.style.borderColor = districtId ? 'var(--border)' : 'var(--red)';
+    selectEl.style.background = districtId ? '#fff' : '#fef2f2';
+  } else {
+    alert('❌ ' + (res?.error || 'Xatolik yuz berdi'));
+    selectEl.value = user.district_id || '';
   }
 }
 

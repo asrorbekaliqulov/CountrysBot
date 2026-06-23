@@ -202,66 +202,6 @@ class TelegramUser(models.Model):
             print(f"User with ID {user_id} does not exist.")
             return None
 
-from django.db.models import Count, Min
-import logging
-import datetime
-
-logger = logging.getLogger(__name__)
-
-def auto_assign_courier(order):
-    """
-    Buyurtmani tuman bo'yicha eng mos kuryerga avtomat biriktirish algoritmi.
-    """
-    if not order.district:
-        logger.warning(f"Order #{order.id} tumaniga ega emas, kuryer biriktirilmadi.")
-        return None
-
-    # 1. Shu tumandagi barcha faol kuryerlarni olamiz
-    couriers = TelegramUser.objects.filter(
-        role='courier',
-        district=order.district,  # yoki region=order.district
-        is_active=True # Agar sizda foydalanuvchi faollik maydoni bo'lsa
-    )
-
-    if not couriers.exists():
-        logger.warning(f"{order.district.name} tumanida hech qanday faol kuryer topilmadi.")
-        return None
-
-    # 2. Kuryerlarning ayni paytdagi faol buyurtmalari sonini va eng oxirgi buyurtma olgan vaqtini hisoblaymiz
-    # Faol statuslar: 'paid' (kuryerga o'tgan), 'picking' (yo'lda/yig'ilmoqda) va h.k.
-    from apps.Bot.models.orders import Order
-
-    couriers_with_stats = couriers.annotate(
-        active_orders_count=Count(
-            'assigned_orders', # Order modelidagi ForeignKey'ning related_name'i
-            filter=~Count('assigned_orders', filter=Order.objects.filter(status__in=['courier_done', 'cancelled']))
-        ),
-        first_order_time=Min('assigned_orders__created_at') # Eng birinchi buyurtma olgan vaqti
-    )
-
-    # 3. Bo'sh kuryerlarni qidiramiz (active_orders_count == 0)
-    free_couriers = [c for c in couriers_with_stats if c.active_orders_count == 0]
-    
-    if free_couriers:
-        # Bo'sh kuryerlardan birinchisini olamiz
-        chosen_courier = free_couriers[0]
-        logger.info(f"Order #{order.id} bo'sh kuryerga biriktirildi: {chosen_courier.tg_id}")
-    else:
-        # 4. Agar hamma band bo'lsa, eng birinchi zakaz olgan (first_order_time eng kichik) kuryerni tanlaymiz
-        # Agar hali umuman zakaz olmagan bo'lsa u allaqachon free_couriers ichida ketgan bo'lardi.
-        chosen_courier = sorted(
-            couriers_with_stats, 
-            key=lambda c: (c.active_orders_count, c.first_order_time or datetime.now())
-        )[0]
-        logger.info(f"Hamma kuryer band. Order #{order.id} eng birinchi zakaz olgan kuryerga biriktirildi: {chosen_courier.tg_id}")
-
-    order.status = 'paid'
-    order.save(update_fields=['status'])
-    
-    # 💥 TODO: Bu yerda Telegram bot orqali kuryerga bildirishnoma yuborish kodi yozilishi mumkin
-    # send_bot_message(chosen_courier.tg_id, f"Sizga yangi buyurtma biriktirildi: #{order.id}")
-    
-    return chosen_courier
 
 class Channel(models.Model):
     """Kanal yoki guruh haqida ma'lumotlarni saqlash uchun model."""
