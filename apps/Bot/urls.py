@@ -47,6 +47,7 @@ from apps.Bot.views.courier import (
     courier_order_done_api,
     courier_order_start_delivery_api,
 )
+from apps.Bot.views import admin_staff
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -121,4 +122,14 @@ urlpatterns = [
     path('courier/orders',                        courier_orders_api,              name='courier_orders'),
     path('courier/orders/<int:order_id>/start',   courier_order_start_delivery_api, name='courier_order_start'),
     path('courier/orders/<int:order_id>/done',    courier_order_done_api,          name='courier_order_done'),
+    
+    # ── Admin - Xodimlar boshqaruvi ────────────────────────────────────────────
+    path('admin/staff/',                   admin_staff.list_staff,                name='admin_staff_list'),
+    path('admin/staff/stats/',             admin_staff.get_staff_stats,           name='admin_staff_stats'),
+    path('admin/staff/add/',               admin_staff.add_staff,                 name='admin_staff_add'),
+    path('admin/staff/remove/',            admin_staff.remove_staff,              name='admin_staff_remove'),
+    path('admin/staff/update-role/',       admin_staff.update_staff_role,         name='admin_staff_update_role'),
+    path('admin/staff/assign-district/',   admin_staff.assign_courier_district,   name='admin_staff_assign_district'),
+    path('admin/staff/<int:staff_id>/',    admin_staff.get_staff_detail,          name='admin_staff_detail'),
+    path('admin/districts/',               admin_staff.get_districts_list,        name='admin_districts_list'),
 ]

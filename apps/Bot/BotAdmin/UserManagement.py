@@ -14,7 +14,7 @@ from ..translations import t
 SEARCH_USER, SELECT_USER, SELECT_ROLE = range(3)
 
 # Sahifalash
-PAGE_SIZE = 10
+PAGE_SIZE = 15
 
 
 @admin_required
@@ -61,37 +61,46 @@ async def users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     
     # Userlar ro'yxati
+    total_pages = (total_users + PAGE_SIZE - 1) // PAGE_SIZE
+    
     text_lines = [
         {
-            'uz': f"👥 <b>Barcha foydalanuvchilar</b>\n📊 Jami: {total_users} ta\n📄 Sahifa: {page + 1}/{(total_users + PAGE_SIZE - 1) // PAGE_SIZE}\n",
-            'ru': f"👥 <b>Все пользователи</b>\n📊 Всего: {total_users}\n📄 Страница: {page + 1}/{(total_users + PAGE_SIZE - 1) // PAGE_SIZE}\n",
-            'en': f"👥 <b>All users</b>\n📊 Total: {total_users}\n📄 Page: {page + 1}/{(total_users + PAGE_SIZE - 1) // PAGE_SIZE}\n"
+            'uz': f"👥 <b>Foydalanuvchilar ro'yxati</b>\n\n📊 Jami: {total_users} ta\n📄 Sahifa: {page + 1} / {total_pages}",
+            'ru': f"👥 <b>Список пользователей</b>\n\n📊 Всего: {total_users}\n📄 Страница: {page + 1} / {total_pages}",
+            'en': f"👥 <b>Users list</b>\n\n📊 Total: {total_users}\n📄 Page: {page + 1} / {total_pages}"
         }[lang]
     ]
     
     # Har bir user uchun
     role_labels = {
-        'uz': {'user': '👤 User', 'courier': '🚗 Kuryer', 'doctor': '👨‍⚕️ Shifokor', 'admin': '👑 Admin'},
-        'ru': {'user': '👤 Пользователь', 'courier': '🚗 Курьер', 'doctor': '👨‍⚕️ Врач', 'admin': '👑 Админ'},
-        'en': {'user': '👤 User', 'courier': '🚗 Courier', 'doctor': '👨‍⚕️ Doctor', 'admin': '👑 Admin'}
+        'uz': {'user': '👤', 'courier': '🚗', 'doctor': '👨‍⚕️', 'admin': '👑'},
+        'ru': {'user': '👤', 'courier': '🚗', 'doctor': '👨‍⚕️', 'admin': '👑'},
+        'en': {'user': '👤', 'courier': '🚗', 'doctor': '👨‍⚕️', 'admin': '👑'}
     }
     
     buttons = []
-    for user in users:
-        role_label = role_labels[lang].get(user.role, user.role)
-        user_text = f"{user.first_name or 'N/A'} (@{user.username or 'no_username'})"
-        text_lines.append(f"━━━━━━━━━━━━━━━━━━━━")
-        text_lines.append(f"🆔 <code>{user.user_id}</code>")
-        text_lines.append(f"👤 {user_text}")
-        text_lines.append(f"📋 {role_label}")
+    row = []
+    for i, user in enumerate(users):
+        role_emoji = role_labels[lang].get(user.role, '👤')
+        # Qisqa username (15 belgidan kam)
+        display_name = user.first_name[:12] if user.first_name and len(user.first_name) > 12 else (user.first_name or str(user.user_id)[:8])
         
-        # Tugma qo'shamiz
-        buttons.append([
+        # Tugma qo'shamiz - 2 ustunda
+        row.append(
             InlineKeyboardButton(
-                f"✏️ {user.first_name or user.user_id}",
+                f"{role_emoji} {display_name}",
                 callback_data=f"edit_user_{user.user_id}"
             )
-        ])
+        )
+        
+        # Har 2 ta tugmadan keyin yangi qator
+        if len(row) == 2:
+            buttons.append(row)
+            row = []
+    
+    # Qolgan tugmani qo'shish (agar toq son bo'lsa)
+    if row:
+        buttons.append(row)
     
     # Navigatsiya tugmalari
     nav_buttons = []
