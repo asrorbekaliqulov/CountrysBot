@@ -132,4 +132,7 @@ urlpatterns = [
     path('admin/staff/assign-district/',   admin_staff.assign_courier_district,   name='admin_staff_assign_district'),
     path('admin/staff/<int:staff_id>/',    admin_staff.get_staff_detail,          name='admin_staff_detail'),
     path('admin/districts/',               admin_staff.get_districts_list,        name='admin_districts_list'),
+    
+    # ── Admin - Barcha foydalanuvchilar ────────────────────────────────────────
+    path('admin/users/',                   admin_staff.list_all_users,            name='admin_users_list'),
 ]

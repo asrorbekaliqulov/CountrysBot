@@ -159,7 +159,7 @@
     <span class="tab-icon">📍</span><span class="tab-text">Tumanlar</span>
   </button>
   <button class="tab-btn" onclick="switchTab('staff')">
-    <span class="tab-icon">👥</span><span class="tab-text">Xodimlar</span>
+    <span class="tab-icon">👥</span><span class="tab-text">Userlar</span>
   </button>
   <button class="tab-btn" onclick="switchTab('broadcast')">
     <span class="tab-icon">📣</span><span class="tab-text">Reklama</span>
@@ -240,7 +240,41 @@
   <!-- STAFF -->
   <div id="tab-staff" class="tab-content">
     <div class="card">
-      <div class="font-semibold mb-2" style="font-size:14px">➕ Yangi Xodim Qo'shish</div>
+      <div class="font-semibold mb-3" style="font-size:14px">👥 Barcha Foydalanuvchilar</div>
+      
+      <!-- Search and Filter -->
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:12px">
+        <input type="text" class="input" id="user-search" placeholder="🔍 Qidiruv: ID, username, ism..." />
+        <select class="select" id="user-role-filter" onchange="loadUsers(1)" style="width:140px">
+          <option value="all">Hammasi</option>
+          <option value="user">👤 User</option>
+          <option value="admin">💻 Admin</option>
+          <option value="courier">🚚 Kuryer</option>
+          <option value="doctor">🩺 Doctor</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="loadUsers(1)" style="width:100%">🔍 Qidirish</button>
+    </div>
+    
+    <div class="card" style="padding:12px">
+      <div class="font-semibold mb-2" style="font-size:14px;display:flex;justify-content:space-between;align-items:center">
+        <span id="users-list-title">👥 Ro'yxat</span>
+        <span class="text-muted text-sm" id="users-count">—</span>
+      </div>
+      <div id="users-list-container" class="table-responsive">
+        <div class="p-4 text-muted" style="text-align:center">Foydalanuvchilar yuklanmoqda...</div>
+      </div>
+      <!-- Pagination -->
+      <div id="users-pagination" style="display:none;margin-top:12px;text-align:center">
+        <button class="btn btn-secondary btn-sm" id="users-prev-btn" onclick="loadUsers(currentUsersPage - 1)" style="margin-right:8px">◀ Avvalgi</button>
+        <span id="users-page-info" style="font-weight:600;margin:0 12px">Sahifa 1 / 1</span>
+        <button class="btn btn-secondary btn-sm" id="users-next-btn" onclick="loadUsers(currentUsersPage + 1)">Keyingi ▶</button>
+      </div>
+    </div>
+    
+    <!-- Old staff form kept for admin use -->
+    <div class="card">
+      <div class="font-semibold mb-2" style="font-size:14px">➕ Yangi Xodim Qo'shish (Admin, Kuryer, Doctor)</div>
       <div class="form-grid-2">
         <input type="number" class="input" id="staff-tg-id" placeholder="Telegram User ID (Majburiy)" />
         <input type="text" class="input" id="staff-name" placeholder="Xodim ismi/FIO" />
@@ -260,12 +294,6 @@
         </select>
       </div>
       <button class="btn btn-success btn-block" onclick="createNewStaff()">👥 Xodimni Bazaga Qo'shish</button>
-    </div>
-    <div class="card" style="padding:12px">
-      <div class="font-semibold mb-2" style="font-size:14px">👥 Ro'yxatdan o'tgan Xodimlar</div>
-      <div id="staff-list-container" class="table-responsive">
-        <div class="p-4 text-muted" style="text-align:center">Xodimlar yuklanmoqda...</div>
-      </div>
     </div>
   </div>
 
@@ -474,7 +502,7 @@ function switchTab(tabId) {
   if (tabId === 'dashboard')  { loadStats(); loadOrders(); }
   if (tabId === 'services')   loadServices();
   if (tabId === 'districts')  { loadRegions(); loadDistricts(); }
-  if (tabId === 'staff')      loadStaff();
+  if (tabId === 'staff')      { loadDistrictsForStaff(); loadUsers(1); }
   if (tabId === 'broadcast')  renderBroadcast();
   if (tabId === 'settings')   loadSettings();
 }
@@ -901,34 +929,135 @@ async function createNewDistrict() {
   }
 }
 
-// ── XODIMLAR ──────────────────────────────────────────────────────────────────
-function toggleStaffDistrictSelect() {
-  const role = document.getElementById('staff-role').value;
-  document.getElementById('staff-district-block').style.display = role === 'courier' ? 'block' : 'none';
-}
+// ── USERLAR (FOYDALANUVCHILAR) ────────────────────────────────────────────────
+let currentUsersPage = 1;
+let totalUsersPages = 1;
+let usersData = [];
 
-async function loadStaff() {
-  const el = document.getElementById('staff-list-container');
+async function loadDistrictsForStaff() {
   if (!districtsData.length) districtsData = await api(`/api/districts/?tg_id=${TG_ID}`) || [];
-
   const dSelect = document.getElementById('staff-district');
   dSelect.innerHTML = '<option value="">-- Tumanni tanlang --</option>';
   districtsData.forEach(d => { dSelect.innerHTML += `<option value="${d.id}">${d.name_uz || d.name}</option>`; });
+}
 
-  staffData = await api(`/api/users/?role=staff&tg_id=${TG_ID}`) || [];
-  if (!staffData.length) { el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">Xodimlar topilmadi.</div>'; return; }
-
-  let html = `<table class="table"><thead><tr><th>User ID</th><th>FIO</th><th>Roli</th><th>Tuman</th><th>Telefon</th></tr></thead><tbody>`;
-  staffData.forEach(s => {
-    const roleBadge = s.role==='admin' ? '<span class="badge badge-blue">💻 Admin</span>' : s.role==='doctor' ? '<span class="badge badge-orange">🩺 Doctor</span>' : '<span class="badge badge-green">🚚 Kuryer</span>';
-    let dName = "—";
-    if (s.role==='courier' && s.district) {
-      const d = districtsData.find(x => x.id === s.district);
-      dName = d ? `<span class="badge badge-orange">📍 ${d.name_uz||d.name}</span>` : `ID:${s.district}`;
+async function loadUsers(page = 1) {
+  const el = document.getElementById('users-list-container');
+  el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">Yuklanmoqda...</div>';
+  
+  const roleFilter = document.getElementById('user-role-filter').value;
+  const search = document.getElementById('user-search').value.trim();
+  
+  let url = `/api/admin/users/?tg_id=${TG_ID}&page=${page}`;
+  if (roleFilter !== 'all') url += `&role=${roleFilter}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  
+  const data = await api(url);
+  if (!data || !data.success) {
+    el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">❌ Xatolik yuz berdi</div>';
+    return;
+  }
+  
+  usersData = data.users || [];
+  currentUsersPage = data.pagination.page;
+  totalUsersPages = data.pagination.total_pages;
+  
+  document.getElementById('users-count').textContent = `Jami: ${data.pagination.total_count} ta`;
+  document.getElementById('users-page-info').textContent = `Sahifa ${currentUsersPage} / ${totalUsersPages}`;
+  
+  if (!usersData.length) {
+    el.innerHTML = '<div class="p-4 text-muted" style="text-align:center">Foydalanuvchilar topilmadi.</div>';
+    document.getElementById('users-pagination').style.display = 'none';
+    return;
+  }
+  
+  // Pagination buttons
+  document.getElementById('users-pagination').style.display = 'block';
+  document.getElementById('users-prev-btn').disabled = !data.pagination.has_previous;
+  document.getElementById('users-next-btn').disabled = !data.pagination.has_next;
+  
+  // Render table
+  let html = `<table class="table"><thead><tr>
+    <th>User ID</th>
+    <th>FIO</th>
+    <th>Username</th>
+    <th>Rol</th>
+    <th>Tuman</th>
+    <th>Til</th>
+    <th>Sana</th>
+  </tr></thead><tbody>`;
+  
+  usersData.forEach(u => {
+    const roleBadges = {
+      admin: '<span class="badge badge-blue">💻 Admin</span>',
+      courier: '<span class="badge badge-green">🚚 Kuryer</span>',
+      doctor: '<span class="badge badge-orange">🩺 Doctor</span>',
+      user: '<span class="badge badge-gray">👤 User</span>'
+    };
+    
+    const currentRole = u.role || 'user';
+    const roleBadge = roleBadges[currentRole] || roleBadges['user'];
+    
+    let districtInfo = '—';
+    if (u.district_name) {
+      districtInfo = `<span class="badge badge-orange" style="font-size:10px">📍 ${esc(u.district_name)}</span>`;
     }
-    html += `<tr><td><code>${s.user_id||s.id}</code></td><td><b>${esc(s.first_name||s.name||'Xodim')}</b></td><td>${roleBadge}</td><td>${dName}</td><td>${s.phone_number||'—'}</td></tr>`;
+    
+    const langMap = { uz: '🇺🇿 UZ', ru: '🇷🇺 RU', en: '🇬🇧 EN' };
+    const langBadge = langMap[u.lang] || u.lang || '—';
+    
+    html += `<tr>
+      <td><code style="font-size:11px">${u.user_id}</code></td>
+      <td><b>${esc(u.first_name)}</b></td>
+      <td><small class="text-muted">@${esc(u.username)}</small></td>
+      <td>
+        <select class="select" id="role-${u.id}" onchange="updateUserRole(${u.id})" style="width:120px;padding:4px 6px;font-size:11px">
+          <option value="user" ${currentRole==='user'?'selected':''}>👤 User</option>
+          <option value="admin" ${currentRole==='admin'?'selected':''}>💻 Admin</option>
+          <option value="courier" ${currentRole==='courier'?'selected':''}>🚚 Kuryer</option>
+          <option value="doctor" ${currentRole==='doctor'?'selected':''}>🩺 Doctor</option>
+        </select>
+      </td>
+      <td>${districtInfo}</td>
+      <td><small>${langBadge}</small></td>
+      <td><small class="text-muted">${u.date_joined}</small></td>
+    </tr>`;
   });
+  
   el.innerHTML = html + '</tbody></table>';
+}
+
+async function updateUserRole(userId) {
+  const selectEl = document.getElementById(`role-${userId}`);
+  const newRole = selectEl.value;
+  const user = usersData.find(u => u.id === userId);
+  
+  if (!user) return;
+  
+  if (!confirm(`${user.first_name} (${user.user_id}) foydalanuvchisining rolini "${newRole}" ga o'zgartirasizmi?`)) {
+    // Revert select
+    selectEl.value = user.role || 'user';
+    return;
+  }
+  
+  const res = await api(`/api/admin/staff/update-role/?tg_id=${TG_ID}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ staff_id: userId, role: newRole })
+  });
+  
+  if (res && res.success) {
+    showToast(`✅ ${user.first_name} roli "${newRole}" ga o'zgartirildi!`);
+    loadUsers(currentUsersPage); // Reload current page
+  } else {
+    alert('❌ ' + (res?.error || 'Xatolik yuz berdi'));
+    selectEl.value = user.role || 'user';
+  }
+}
+
+function toggleStaffDistrictSelect() {
+  const role = document.getElementById('staff-role').value;
+  document.getElementById('staff-district-block').style.display = role === 'courier' ? 'block' : 'none';
 }
 
 async function createNewStaff() {
@@ -947,7 +1076,7 @@ async function createNewStaff() {
     showToast('👥 Xodim qo\'shildi!');
     ['staff-tg-id','staff-name','staff-phone'].forEach(id => document.getElementById(id).value='');
     document.getElementById('staff-district').value='';
-    loadStaff();
+    loadUsers(1);
   }
 }
 

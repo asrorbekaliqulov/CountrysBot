@@ -425,3 +425,79 @@ async def get_staff_stats(request):
             'couriers_with_district': couriers_with_district,
         }
     })
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+@async_view
+@admin_required
+async def list_all_users(request):
+    """
+    Barcha foydalanuvchilar ro'yxati
+    
+    Query params:
+    - tg_id: admin user ID (required)
+    - role: filter by role (all, user, admin, courier, doctor) - optional
+    - page: sahifa raqami (default: 1)
+    - search: qidiruv (optional - ID, username, name)
+    """
+    role_filter = request.GET.get('role', 'all')
+    page = int(request.GET.get('page', 1))
+    search = request.GET.get('search', '').strip()
+    
+    # Base queryset - barcha userlar
+    queryset = TelegramUser.objects.select_related('district', 'district__region').order_by('-date_joined')
+    
+    # Role filter
+    if role_filter != 'all':
+        queryset = queryset.filter(role=role_filter)
+    
+    # Search filter
+    if search:
+        from django.db.models import Q
+        queryset = queryset.filter(
+            Q(first_name__icontains=search) |
+            Q(username__icontains=search) |
+            Q(user_id__icontains=search)
+        )
+    
+    # Convert to list for pagination
+    users_list = await sync_to_async(list)(queryset)
+    
+    # Pagination - 50 ta har bir sahifada
+    paginator = Paginator(users_list, 50)
+    page_obj = paginator.get_page(page)
+    
+    # Serialize data
+    users_data = []
+    for user in page_obj:
+        district_name = user.district.name if user.district else None
+        region_name = user.district.region.name if user.district and user.district.region else None
+        
+        users_data.append({
+            'id': user.id,
+            'user_id': user.user_id,
+            'first_name': user.first_name or 'N/A',
+            'username': user.username or 'N/A',
+            'role': user.role or 'user',
+            'is_admin': user.is_admin,
+            'is_active': user.is_active,
+            'district_id': user.district.id if user.district else None,
+            'district_name': district_name,
+            'region_name': region_name,
+            'phone': user.phone_number,
+            'lang': user.lang,
+            'date_joined': user.date_joined.strftime('%d.%m.%Y %H:%M') if user.date_joined else 'N/A',
+        })
+    
+    return JsonResponse({
+        'success': True,
+        'users': users_data,
+        'pagination': {
+            'page': page,
+            'total_pages': paginator.num_pages,
+            'total_count': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+        }
+    })
