@@ -1,9 +1,10 @@
-from apps.Bot.BotCommands.StartCommand import main_menu_callback, set_lang_callback, intro_video_text_callback, intro_video_text_callback
+from apps.Bot.BotCommands.StartCommand import main_menu_callback, set_lang_callback, intro_video_text_callback
 
 from ..MandatoryChannel import AddChannel_ConvHandler, MandatoryChannelOrGroupList, start_delete_mandatory, delete_mandatory
 from ..BotCommands import start
 from ..BotAdmin import admin_menyu, add_admin_handler, the_first_admin, remove_admin_handler, AdminList
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from ..BotAdmin.UserManagement import users_list, users_next_page, users_prev_page, search_user, process_search, edit_user, set_user_role, SEARCH_USER
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ConversationHandler
 from ..BotHandler import send_msg_handler, bot_stats, InlineButton, guide, guide_create_conv, guide_update_conv, guide_delete_conv, AdminGuide, appeal_conv, list_appeals, show_appeal_detail, handle_admin_reply, all_appeals, handle_results, handle_profile, handle_order_status, feedback_conv_handler, feedback_start
 from datetime import datetime, timedelta
 from ..BotCommands.DownDB import DownlBD
@@ -43,6 +44,16 @@ def main():
     app.add_handler(guide_delete_conv)
     app.add_handler(appeal_conv)
     app.add_handler(feedback_conv_handler)
+    
+    # User search conversation handler
+    user_search_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(search_user, pattern=r"^search_user$")],
+        states={
+            SEARCH_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_search)],
+        },
+        fallbacks=[CallbackQueryHandler(users_list, pattern=r"^users_management$")],
+    )
+    app.add_handler(user_search_handler)
 
 
 
@@ -65,6 +76,13 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_order_status, pattern=r"^order_status$"))
     app.add_handler(CallbackQueryHandler(handle_results, pattern=r"^my_results$"))
     app.add_handler(CallbackQueryHandler(handle_profile, pattern=r"^my_profile$"))
+
+    # Userlar boshqaruvi
+    app.add_handler(CallbackQueryHandler(users_list, pattern=r"^users_management$"))
+    app.add_handler(CallbackQueryHandler(users_next_page, pattern=r"^users_next_page$"))
+    app.add_handler(CallbackQueryHandler(users_prev_page, pattern=r"^users_prev_page$"))
+    app.add_handler(CallbackQueryHandler(edit_user, pattern=r"^edit_user_\d+$"))
+    app.add_handler(CallbackQueryHandler(set_user_role, pattern=r"^set_role_\d+_(user|courier|doctor|admin)$"))
 
     app.add_handler(CallbackQueryHandler(set_lang_callback, pattern=r"^set_lang:(uz|ru|en)$"))
     app.add_handler(CallbackQueryHandler(intro_video_text_callback, pattern=r"^(intro_video|intro_text)$"))
