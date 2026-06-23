@@ -4,15 +4,27 @@ from ..models.TelegramBot import TelegramUser, Appeal
 from ..decorators import mandatory_channel_required, admin_required, typing_action
 from asgiref.sync import sync_to_async
 from django.utils.html import strip_tags
+from ..translations import t
 
 
 
 @mandatory_channel_required
 async def Message_to_Admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.callback_query.edit_message_text(text="Adminga yubormochi bo'lgan xabarni kiritingiz.",
-                                                  reply_markup=InlineKeyboardMarkup([
-                                                      [InlineKeyboardButton("Bekor qilish", callback_data="cancel")]
-                                                  ]))
+    tg_user = update.effective_user
+    
+    # Til aniqlash
+    try:
+        user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
+        lang = user.lang or 'uz'
+    except:
+        lang = 'uz'
+    
+    await update.callback_query.edit_message_text(
+        text=t("support_send_message", lang),
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton(t("btn_cancel", lang), callback_data="cancel")]
+        ])
+    )
     return "Send_Message_to_Admin"
     
 
@@ -23,14 +35,20 @@ async def Send_Message_to_Admin(update: Update, context: ContextTypes.DEFAULT_TY
     if not admin_ids:
         admin_ids = [6194484795]  # Default admin ID if no admins are found
     user = await sync_to_async(TelegramUser.objects.get)(user_id=update.effective_user.id)
+    lang = user.lang or 'uz'
+    
     user_info = f"<b>User ID: <code>{user.user_id}</code>\nUsername: @{user.username}\nFull Name: {user.first_name}</b>"
     await sync_to_async(Appeal.objects.create)(user=user, message=message_text, message_id=message_id)
     message_text = f"{user_info}\n\n{message_text}"
     for admin_id in admin_ids:
         await context.bot.send_message(chat_id=admin_id, text=f"Yangi xabar:\n\n{message_text}", parse_mode="HTML")
-    await update.message.reply_text("Xabani adminga yubordim🤓\nTez orada javob olasiz!!!", reply_markup=InlineKeyboardMarkup([
-        [InlineKeyboardButton("Asosiy menyu", callback_data="Main_Menu")]
-    ]))
+    
+    await update.message.reply_text(
+        t("support_message_sent", lang), 
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton(t("btn_back", lang), callback_data="Main_Menu")]
+        ])
+    )
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):

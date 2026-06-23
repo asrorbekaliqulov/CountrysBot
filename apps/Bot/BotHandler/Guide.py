@@ -5,13 +5,25 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMa
 from ..decorators import mandatory_channel_required, admin_required
 from asgiref.sync import sync_to_async
 from telegram.ext import ConversationHandler
+from ..translations import t
 
 @mandatory_channel_required
 async def guide(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Sends a guide message to the user when they request help.
     """
-    await update.callback_query.answer("ℹ️Qo'llanma")
+    tg_user = update.effective_user
+    
+    # Til aniqlash
+    try:
+        from ..models.TelegramBot import TelegramUser
+        user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
+        lang = user.lang or 'uz'
+    except:
+        lang = 'uz'
+    
+    await update.callback_query.answer(t("guide_help", lang))
+    
     # Faqat status=True bo'lganlarni olish va id bo'yicha tartiblash
     guides = await sync_to_async(lambda: list(Guide.objects.filter(status=True).order_by('id')))()
     if len(guides) >= 2:
@@ -22,13 +34,13 @@ async def guide(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         guide = guides[0]
         guide_content = f"<b>{guide.title}</b>\n\n{guide.content}"
     else:
-        guide_content = "No guide available"
+        guide_content = t("guide_no_content", lang)
 
     await update.callback_query.edit_message_text(
         text=guide_content,
         parse_mode='HTML',
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Back to Main Menu", callback_data="Main_Menu")]
+            [InlineKeyboardButton(t("btn_back", lang), callback_data="Main_Menu")]
         ])
     )
 
@@ -40,19 +52,56 @@ cancel_button = InlineKeyboardButton("Bekor qilish", callback_data='cancel')
 
 @admin_required
 async def start_create_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Yangi qo'llanma sarlavhasini kiriting:", reply_markup=InlineKeyboardMarkup([[cancel_button]]))
+    # Til aniqlash
+    tg_user = update.effective_user
+    try:
+        from ..models.TelegramBot import TelegramUser
+        user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
+        lang = user.lang or 'uz'
+    except:
+        lang = 'uz'
+    
+    cancel_button_translated = InlineKeyboardButton(t("btn_cancel", lang), callback_data='cancel')
+    await update.message.reply_text(
+        t("guide_create_title", lang), 
+        reply_markup=InlineKeyboardMarkup([[cancel_button_translated]])
+    )
     return CREATE_TITLE
 
 async def create_guide_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['guide_title'] = update.message.text
-    await update.message.reply_text("Qo'llanma matnini kiriting:", reply_markup=InlineKeyboardMarkup([[cancel_button]]))
+    
+    # Til aniqlash
+    tg_user = update.effective_user
+    try:
+        from ..models.TelegramBot import TelegramUser
+        user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
+        lang = user.lang or 'uz'
+    except:
+        lang = 'uz'
+    
+    cancel_button_translated = InlineKeyboardButton(t("btn_cancel", lang), callback_data='cancel')
+    await update.message.reply_text(
+        t("guide_create_content", lang), 
+        reply_markup=InlineKeyboardMarkup([[cancel_button_translated]])
+    )
     return CREATE_CONTENT
 
 async def create_guide_content(update: Update, context: ContextTypes.DEFAULT_TYPE):
     title = context.user_data['guide_title']
     content = update.message.text_html
+    
+    # Til aniqlash
+    tg_user = update.effective_user
+    try:
+        from ..models.TelegramBot import TelegramUser
+        user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
+        lang = user.lang or 'uz'
+    except:
+        lang = 'uz'
+    
     await sync_to_async(Guide.objects.create)(title=title, content=content, status=True)
-    await update.message.reply_text("Qo'llanma muvaffaqiyatli yaratildi.")
+    await update.message.reply_text(t("guide_created", lang))
     return ConversationHandler.END
 
 @admin_required

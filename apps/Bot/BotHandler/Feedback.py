@@ -8,6 +8,7 @@ from asgiref.sync import sync_to_async
 
 from apps.Bot.models.TelegramBot import TelegramUser
 from apps.Bot.models.feedback import Feedback
+from apps.Bot.translations import t
 
 logger = logging.getLogger(__name__)
 
@@ -24,46 +25,28 @@ async def feedback_start(update: Update, context):
     tg_user = update.effective_user
     try:
         user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
-        lang = user.lang
+        lang = user.lang or 'uz'
     except TelegramUser.DoesNotExist:
         lang = 'uz'
 
     # Tugmalar
-    buttons = {
-        'uz': [
-            [InlineKeyboardButton("⭐ Baholash", callback_data="feedback_rate")],
-            [InlineKeyboardButton("📝 Faqat taklif yozish", callback_data="feedback_suggestion")],
-            [InlineKeyboardButton("🔙 Orqaga", callback_data="Main_Menu")],
-        ],
-        'ru': [
-            [InlineKeyboardButton("⭐ Оценить", callback_data="feedback_rate")],
-            [InlineKeyboardButton("📝 Только предложение", callback_data="feedback_suggestion")],
-            [InlineKeyboardButton("🔙 Назад", callback_data="Main_Menu")],
-        ],
-        'en': [
-            [InlineKeyboardButton("⭐ Rate", callback_data="feedback_rate")],
-            [InlineKeyboardButton("📝 Suggestion only", callback_data="feedback_suggestion")],
-            [InlineKeyboardButton("🔙 Back", callback_data="Main_Menu")],
-        ],
-    }
+    buttons = [
+        [InlineKeyboardButton(t("feedback_rate", lang), callback_data="feedback_rate")],
+        [InlineKeyboardButton(t("feedback_suggestion", lang), callback_data="feedback_suggestion")],
+        [InlineKeyboardButton(t("btn_back", lang), callback_data="Main_Menu")],
+    ]
 
-    text = {
-        'uz': "⭐️ Fikr va baholash\n\nXizmatimizni baholang yoki takliflaringizni yozing:",
-        'ru': "⭐️ Отзыв и оценка\n\nОцените нашу услугу или напишите предложения:",
-        'en': "⭐️ Feedback and rating\n\nRate our service or write suggestions:",
-    }
-
-    keyboard = InlineKeyboardMarkup(buttons.get(lang, buttons['uz']))
+    keyboard = InlineKeyboardMarkup(buttons)
 
     try:
         await query.edit_message_text(
-            text=text.get(lang, text['uz']),
+            text=t("feedback_title", lang),
             reply_markup=keyboard
         )
     except Exception:
         await context.bot.send_message(
             chat_id=tg_user.id,
-            text=text.get(lang, text['uz']),
+            text=t("feedback_title", lang),
             reply_markup=keyboard
         )
 
@@ -78,7 +61,7 @@ async def feedback_rating_start(update: Update, context):
     tg_user = update.effective_user
     try:
         user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
-        lang = user.lang
+        lang = user.lang or 'uz'
     except TelegramUser.DoesNotExist:
         lang = 'uz'
 
@@ -91,26 +74,20 @@ async def feedback_rating_start(update: Update, context):
             InlineKeyboardButton("⭐⭐⭐⭐", callback_data="rate_4"),
             InlineKeyboardButton("⭐⭐⭐⭐⭐", callback_data="rate_5"),
         ],
-        [InlineKeyboardButton("🔙 Orqaga", callback_data="feedback")],
+        [InlineKeyboardButton(t("btn_back", lang), callback_data="feedback")],
     ]
-
-    text = {
-        'uz': "⭐️ Xizmatimizni baholang (1-5):",
-        'ru': "⭐️ Оцените нашу услугу (1-5):",
-        'en': "⭐️ Rate our service (1-5):",
-    }
 
     keyboard = InlineKeyboardMarkup(buttons)
 
     try:
         await query.edit_message_text(
-            text=text.get(lang, text['uz']),
+            text=t("feedback_rate_service", lang),
             reply_markup=keyboard
         )
     except Exception:
         await context.bot.send_message(
             chat_id=tg_user.id,
-            text=text.get(lang, text['uz']),
+            text=t("feedback_rate_service", lang),
             reply_markup=keyboard
         )
 
@@ -125,22 +102,16 @@ async def feedback_suggestion_start(update: Update, context):
     tg_user = update.effective_user
     try:
         user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
-        lang = user.lang
+        lang = user.lang or 'uz'
     except TelegramUser.DoesNotExist:
         lang = 'uz'
 
-    text = {
-        'uz': "📝 Taklifingizni yozing:\n\nYuborish uchun xabaringizni yuboring.",
-        'ru': "📝 Напишите ваше предложение:\n\nОтправьте сообщение для отправки.",
-        'en': "📝 Write your suggestion:\n\nSend your message to submit.",
-    }
-
     try:
-        await query.edit_message_text(text=text.get(lang, text['uz']))
+        await query.edit_message_text(text=t("feedback_write_suggestion", lang))
     except Exception:
         await context.bot.send_message(
             chat_id=tg_user.id,
-            text=text.get(lang, text['uz'])
+            text=t("feedback_write_suggestion", lang)
         )
 
     context.user_data['feedback_type'] = 'suggestion'
@@ -158,30 +129,24 @@ async def feedback_rating_selected(update: Update, context):
     tg_user = update.effective_user
     try:
         user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
-        lang = user.lang
+        lang = user.lang or 'uz'
     except TelegramUser.DoesNotExist:
         lang = 'uz'
 
-    text = {
-        'uz': f"⭐️ Siz {rating} yulduz tanladingiz.\n\nQo'shimcha fikringiz bormi? Yuborish uchun xabaringizni yuboring, yoki \"Skip\" tugmasini bosing.",
-        'ru': f"⭐️ Вы выбрали {rating} звезд.\n\nЕсть ли дополнительные комментарии? Отправьте сообщение или нажмите \"Skip\".",
-        'en': f"⭐️ You selected {rating} stars.\n\nAny additional comments? Send a message or press \"Skip\".",
-    }
-
     buttons = [
-        [InlineKeyboardButton("⏭️ Skip", callback_data="rate_skip")],
+        [InlineKeyboardButton(t("feedback_skip", lang), callback_data="rate_skip")],
     ]
     keyboard = InlineKeyboardMarkup(buttons)
 
     try:
         await query.edit_message_text(
-            text=text.get(lang, text['uz']),
+            text=t("feedback_rating_selected", lang, rating=rating),
             reply_markup=keyboard
         )
     except Exception:
         await context.bot.send_message(
             chat_id=tg_user.id,
-            text=text.get(lang, text['uz']),
+            text=t("feedback_rating_selected", lang, rating=rating),
             reply_markup=keyboard
         )
 
@@ -198,7 +163,7 @@ async def feedback_text_received(update: Update, context):
 
     try:
         user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
-        lang = user.lang
+        lang = user.lang or 'uz'
     except TelegramUser.DoesNotExist:
         lang = 'uz'
 
@@ -210,11 +175,7 @@ async def feedback_text_received(update: Update, context):
             text=text,
             is_suggestion_only=True
         )
-        response_text = {
-            'uz': "✅ Taklifingiz qabul qilindi! Rahmat!",
-            'ru': "✅ Ваше предложение принято! Спасибо!",
-            'en': "✅ Your suggestion has been accepted! Thank you!",
-        }
+        response_text = t("feedback_suggestion_thanks", lang)
     else:
         await sync_to_async(Feedback.objects.create)(
             user=user,
@@ -222,13 +183,9 @@ async def feedback_text_received(update: Update, context):
             text=text,
             is_suggestion_only=False
         )
-        response_text = {
-            'uz': f"✅ Fikringiz qabul qilindi! ({rating} ⭐)\n\nRahmat!",
-            'ru': f"✅ Ваш отзыв принят! ({rating} ⭐)\n\nСпасибо!",
-            'en': f"✅ Your feedback has been accepted! ({rating} ⭐)\n\nThank you!",
-        }
+        response_text = t("feedback_thanks", lang, rating=rating)
 
-    await update.message.reply_text(response_text.get(lang, response_text['uz']))
+    await update.message.reply_text(response_text)
 
     # Asosiy menyuga qaytish
     from ..BotCommands.StartCommand import start
@@ -247,7 +204,7 @@ async def feedback_skip(update: Update, context):
 
     try:
         user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
-        lang = user.lang
+        lang = user.lang or 'uz'
     except TelegramUser.DoesNotExist:
         lang = 'uz'
 
@@ -259,18 +216,14 @@ async def feedback_skip(update: Update, context):
         is_suggestion_only=False
     )
 
-    response_text = {
-        'uz': f"✅ Baholashingiz qabul qilindi! ({rating} ⭐)\n\nRahmat!",
-        'ru': f"✅ Ваша оценка принята! ({rating} ⭐)\n\nСпасибо!",
-        'en': f"✅ Your rating has been accepted! ({rating} ⭐)\n\nThank you!",
-    }
+    response_text = t("feedback_rating_thanks", lang, rating=rating)
 
     try:
-        await query.edit_message_text(response_text.get(lang, response_text['uz']))
+        await query.edit_message_text(response_text)
     except Exception:
         await context.bot.send_message(
             chat_id=tg_user.id,
-            text=response_text.get(lang, response_text['uz'])
+            text=response_text
         )
 
     # Asosiy menyuga qaytish

@@ -4,6 +4,7 @@ from ..models.TelegramBot import TelegramUser
 from telegram.constants import ParseMode
 from asgiref.sync import sync_to_async
 from ..decorators import admin_required
+from ..translations import t
 
 from warnings import filterwarnings
 from telegram.warnings import PTBUserWarning
@@ -33,16 +34,33 @@ def get_user_ids():
 @admin_required
 async def send_message(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
+    tg_user = update.effective_user
+    
+    # Til olish
+    try:
+        user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
+        lang = user.lang or "uz"
+    except TelegramUser.DoesNotExist:
+        lang = "uz"
 
-    # Xabar turini tanlash uchun variantlar ['oddiy', 'photo', 'video', 'audio', 'file']
+    # Xabar turini tanlash uchun variantlar
     inline_keyboard = [
-        [InlineKeyboardButton("💬Text xabar💬", callback_data='text'), InlineKeyboardButton('🖼Rasmli xabar🖼', callback_data='photo')],
-        [InlineKeyboardButton('🎞Video xabar🎞', callback_data='video'), InlineKeyboardButton('🔈Audio xabar🔈', callback_data='audio')],
-        [InlineKeyboardButton('📁Fayl xabar📂', callback_data='file'), InlineKeyboardButton('🎙Ovozli xabar🎙', callback_data='voice')]
+        [
+            InlineKeyboardButton(t("send_msg_text", lang), callback_data='text'),
+            InlineKeyboardButton(t("send_msg_photo", lang), callback_data='photo')
+        ],
+        [
+            InlineKeyboardButton(t("send_msg_video", lang), callback_data='video'),
+            InlineKeyboardButton(t("send_msg_audio", lang), callback_data='audio')
+        ],
+        [
+            InlineKeyboardButton(t("send_msg_file", lang), callback_data='file'),
+            InlineKeyboardButton(t("send_msg_voice", lang), callback_data='voice')
+        ]
     ]
 
     await update.callback_query.edit_message_text(
-        "Xabar turini tanlang:",
+        t("send_msg_select_type", lang),
         reply_markup=InlineKeyboardMarkup(inline_keyboard)
     )
     return ASK_TYPE
@@ -53,13 +71,30 @@ async def ask_type(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()  # Callback tugmalarini ishlatishda javob berish
     context.user_data['message_type'] = query.data
-    await query.edit_message_text("Endi xabarni yuboring:")
+    
+    # Til olish
+    tg_user = update.effective_user
+    try:
+        user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
+        lang = user.lang or "uz"
+    except TelegramUser.DoesNotExist:
+        lang = "uz"
+    
+    await query.edit_message_text(t("send_msg_now", lang))
     return GET_MESSAGE
 
 # Admin xabarni yuborganidan so'ng
 @admin_required
 async def get_message(update: Update, context: CallbackContext):
     admin_id = update.effective_user.id
+    
+    # Til olish
+    try:
+        user = await sync_to_async(TelegramUser.objects.get)(user_id=admin_id)
+        lang = user.lang or "uz"
+    except TelegramUser.DoesNotExist:
+        lang = "uz"
+    
     try:
         message_type = context.user_data.get('message_type')
         message_caption = update.message.caption_html if update.message.caption else ""
@@ -92,12 +127,20 @@ async def get_message(update: Update, context: CallbackContext):
             print(f"Xatolik yuz berdi")
 
     # Adminga nechta foydalanuvchiga yuborilganini ko'rsatish
-    await update.message.reply_text(f"{total_users} ta foydalanuvchiga xabar yuborildi.")
+    await update.message.reply_text(t("send_msg_sent", lang, count=total_users))
     return ConversationHandler.END
 
 # Bekor qilish funksiyasi
 async def cancel(update: Update, context: CallbackContext):
-    await update.message.reply_text("Xabar yuborish bekor qilindi.")
+    # Til olish
+    tg_user = update.effective_user
+    try:
+        user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
+        lang = user.lang or "uz"
+    except TelegramUser.DoesNotExist:
+        lang = "uz"
+    
+    await update.message.reply_text(t("send_msg_cancelled", lang))
     return ConversationHandler.END
 
 

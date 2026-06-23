@@ -2,6 +2,7 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton,KeyboardButtonR
 from telegram.ext import ContextTypes, ConversationHandler, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from apps.Bot.models.TelegramBot import TelegramUser  # Django modelingizni import qiling
 from ..decorators import admin_required
+from ..translations import t
 
 from warnings import filterwarnings
 from telegram.warnings import PTBUserWarning
@@ -17,14 +18,24 @@ async def start_add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     """
     Admin qo'shishni boshlaydi.
     """
+    tg_user = update.effective_user
+    
+    # Til aniqlash
+    try:
+        from asgiref.sync import sync_to_async
+        user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
+        lang = user.lang or 'uz'
+    except:
+        lang = 'uz'
+    
     await update.callback_query.delete_message()
     await context.bot.send_message(
         chat_id=update.effective_user.id,
-        text="Quyidagi tugmani bosish orqali kerakli foydalanuvchini tanlang:",
+        text=t("admin_add_select_user", lang),
         reply_markup=ReplyKeyboardMarkup([
             [
                 KeyboardButton(
-                    text="Foydalanuvchilar", 
+                    text=t("admin_add_select_btn", lang), 
                     request_users=KeyboardButtonRequestUsers(
                         request_id=3,
                         user_is_bot=False
@@ -63,16 +74,31 @@ async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     choice = update.message.text.lower()
     user_id = context.user_data.get('user_id')
+    tg_user = update.effective_user
+    
+    # Til aniqlash
+    try:
+        from asgiref.sync import sync_to_async
+        admin_user = await sync_to_async(TelegramUser.objects.get)(user_id=tg_user.id)
+        lang = admin_user.lang or 'uz'
+    except:
+        lang = 'uz'
 
-    if choice == "ha":
+    if choice in ["ha", "yes", "да"]:
         user = await TelegramUser.make_admin(user_id=user_id)
         if user:
-            await update.message.reply_text(f"Foydalanuvchi {user} admin qilindi.", reply_markup=ReplyKeyboardRemove())
-            await context.bot.send_message(chat_id=user_id, text="Tabriklayman siz hozirgina admin bo'ldingiz")
+            await update.message.reply_text(
+                t("admin_add_success", lang, user=user), 
+                reply_markup=ReplyKeyboardRemove()
+            )
+            await context.bot.send_message(
+                chat_id=user_id, 
+                text=t("admin_add_success_notify", lang)
+            )
         else:
-            await update.message.reply_text("Bunday foydalanuvchi topilmadi.")
-    elif choice == "yo'q":
-        await update.message.reply_text("Amal bekor qilindi.")
+            await update.message.reply_text(t("admin_add_not_found", lang))
+    elif choice in ["yo'q", "no", "нет"]:
+        await update.message.reply_text(t("admin_add_cancelled", lang))
     else:
         await update.message.reply_text("Iltimos, faqat 'Ha' yoki 'Yo'q' deb javob bering.")
         return CONFIRM
@@ -101,10 +127,19 @@ async def the_first_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user_id = update.effective_user.id
         admins_count = await TelegramUser.count_admin_users()
+        
+        # Til aniqlash
+        try:
+            from asgiref.sync import sync_to_async
+            user = await sync_to_async(TelegramUser.objects.get)(user_id=user_id)
+            lang = user.lang or 'uz'
+        except:
+            lang = 'uz'
+        
         if admins_count < 1:
             user = await TelegramUser.make_admin(user_id=user_id)
-            await update.message.reply_text(f"Siz Admin bo'ldingiz")
+            await update.message.reply_text(t("admin_first_success", lang))
         else:
-            await update.message.reply_text("Botda boshqa admin mavjud.")
+            await update.message.reply_text(t("admin_first_exists", lang))
     except:
-        await update.message.reply_text("Qandaydir xatolik ro'y berdi.")
+        await update.message.reply_text(t("error_generic", "uz"))
