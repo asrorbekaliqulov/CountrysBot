@@ -1,0 +1,1178 @@
+/* NMED HOME LAB — User WebApp */
+(function () {
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+    if (tg.requestFullscreen) {
+      try {
+        tg.requestFullscreen();
+      } catch (e) {
+        /* eski Telegram versiyalari */
+      }
+    }
+    if (tg.setHeaderColor) tg.setHeaderColor('#0a1128');
+    if (tg.setBackgroundColor) tg.setBackgroundColor('#0a1128');
+    document.documentElement.classList.add('tg-webapp');
+  }
+
+  const params = new URLSearchParams(location.search);
+  const initialPage = params.get('page') || 'home';
+  let currentLang = (params.get('lang') || '').split('-')[0];
+  if (!['uz', 'ru', 'en'].includes(currentLang)) currentLang = '';
+
+  let tgId = params.get('tg_id') || '';
+  if (!tgId && tg?.initDataUnsafe?.user?.id) {
+    tgId = String(tg.initDataUnsafe.user.id);
+  }
+
+  let appSettings = {};
+  let servicesData = [];
+  let districtsData = [];
+  let wizardStep = 1;
+  let wizardTotal = 9;
+  let map, marker;
+  let lastOrderCode = '';
+  let wizardSuccessMode = false;
+  let wizardBodyTemplate = '';
+
+  const orderState = {
+    tg_id: tgId,
+    service: null,
+    patient_type: null,
+    patient_name: '',
+    patient_age: '',
+    patient_gender: null,
+    child_timing: null,
+    uses_diaper: null,
+    complaints: [],
+    custom_complaint: '',
+    pickup_slot: '',
+    district: null,
+    address_note: '',
+    phone: '',
+    latitude: 41.31108,
+    longitude: 69.24056,
+    payment_method: null,
+    locationServed: null,
+    detectedAddress: '',
+  };
+
+  const T = window.NMED_I18N || { uz: {}, ru: {}, en: {} };
+
+  function tr(key) {
+    const L = T[currentLang] || T.uz;
+    const val = L[key];
+    if (typeof val === 'function') return val;
+    return val || T.uz[key] || key;
+  }
+
+  function serviceName(s) {
+    if (!s) return '—';
+    if (currentLang === 'ru') return s.name_ru || s.name_uz || s.name || '—';
+    if (currentLang === 'en') return s.name_en || s.name_uz || s.name || '—';
+    return s.name_uz || s.name || '—';
+  }
+
+  function applyI18n() {
+    document.documentElement.lang = currentLang || 'uz';
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      const key = el.dataset.i18n;
+      const val = tr(key);
+      if (val && typeof val === 'string') el.textContent = val;
+    });
+    document.querySelectorAll('[data-i18n-ph]').forEach((el) => {
+      const val = tr(el.dataset.i18nPh);
+      if (val && typeof val === 'string') el.placeholder = val;
+    });
+    const backBtn = document.getElementById('btnBack');
+    if (backBtn) backBtn.setAttribute('aria-label', tr('back'));
+  }
+
+  async function initLang() {
+    const urlLang = params.get('lang');
+    if (urlLang && ['uz', 'ru', 'en'].includes(urlLang.split('-')[0])) {
+      currentLang = urlLang.split('-')[0];
+      return;
+    }
+    if (tgId) {
+      try {
+        const p = await api('/api/webapp/profile/');
+        if (p.lang && ['uz', 'ru', 'en'].includes(p.lang)) {
+          currentLang = p.lang;
+          return;
+        }
+      } catch (e) {
+        console.warn('Profile lang', e);
+      }
+    }
+    const tgLang = tg?.initDataUnsafe?.user?.language_code;
+    if (tgLang) {
+      const code = tgLang.split('-')[0];
+      if (['uz', 'ru', 'en'].includes(code)) {
+        currentLang = code;
+        return;
+      }
+    }
+    currentLang = 'uz';
+  }
+
+  async function api(url, opts = {}) {
+    const sep = url.includes('?') ? '&' : '?';
+    const withId = tgId && !url.includes('tg_id=') ? `${url}${sep}tg_id=${tgId}` : url;
+    const r = await fetch(withId, opts);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const ct = r.headers.get('content-type') || '';
+    if (ct.includes('application/json')) return r.json();
+    return r.text();
+  }
+
+  function alertError(message) {
+    const msg = (message || tr('error')).trim();
+    const generic = tr('error');
+    if (!msg || msg === generic || msg === 'Error' || msg === 'Xatolik') {
+      alert(generic);
+      return;
+    }
+    if (msg.startsWith(generic + ':') || msg.startsWith('Error:')) {
+      alert(msg);
+      return;
+    }
+    alert(msg);
+  }
+
+  function formatApiError(data) {
+    if (!data) return tr('error');
+    if (typeof data === 'string') return data;
+    if (typeof data.detail === 'string' && data.detail.trim()) return data.detail.trim();
+    if (Array.isArray(data.detail)) return data.detail.map(String).join('\n');
+    if (typeof data.detail === 'object' && data.detail !== null) {
+      return Object.entries(data.detail)
+        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+        .join('\n');
+    }
+    if (data.errors && typeof data.errors === 'object') {
+      return Object.entries(data.errors)
+        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+        .join('\n');
+    }
+    if (data.screenshot) return String(Array.isArray(data.screenshot) ? data.screenshot[0] : data.screenshot);
+    return tr('error');
+  }
+
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function initIcons() {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ attrs: { 'stroke-width': 2 } });
+    }
+  }
+
+  function showScreen(name) {
+    document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
+    const el = document.getElementById(`screen-${name}`);
+    if (el) el.classList.add('active');
+    const backBtn = document.getElementById('btnBack');
+    if (backBtn) backBtn.classList.toggle('visible', name !== 'home' && !wizardSuccessMode);
+    const header = document.getElementById('appHeader');
+    if (header) {
+      header.classList.toggle('hidden', name === 'home' || wizardSuccessMode);
+      header.classList.toggle('compact', name !== 'home' && !wizardSuccessMode);
+    }
+    if (name === 'orders') loadOrders();
+    if (name === 'results') loadResults();
+    if (name === 'profile') loadProfile();
+    if (name === 'order-detail') { /* filled by openOrder */ }
+    if (name === 'wizard' && !wizardSuccessMode) updateWizardUI();
+  }
+
+  function goHome() {
+    wizardSuccessMode = false;
+    if (!document.querySelector('.wizard-step')) {
+      location.href = location.pathname + `?lang=${currentLang}${tgId ? '&tg_id=' + tgId : ''}`;
+      return;
+    }
+    showScreen('home');
+    history.replaceState(null, '', location.pathname + `?lang=${currentLang}${tgId ? '&tg_id=' + tgId : ''}`);
+  }
+
+  async function loadSettings() {
+    try {
+      appSettings = await api('/api/webapp/settings/');
+      applyPaymentCardUI();
+    } catch (e) {
+      console.warn('Settings', e);
+    }
+  }
+
+  function applyPaymentCardUI() {
+    const num = document.getElementById('cardNumberDisplay');
+    const holder = document.getElementById('cardHolderDisplay');
+    if (num) num.textContent = appSettings.payment_card_number || '—';
+    if (holder) holder.textContent = appSettings.payment_card_holder || '—';
+  }
+
+  /* ── HOME ── */
+  function initHome() {
+    applyI18n();
+    initIcons();
+  }
+
+  /* ── WIZARD ── */
+  function startWizard() {
+    wizardSuccessMode = false;
+    const body = document.getElementById('wizardBody');
+    if (body && wizardBodyTemplate && !document.querySelector('.wizard-step')) {
+      body.innerHTML = wizardBodyTemplate;
+      bindWizardEvents();
+    }
+    wizardStep = 1;
+    orderState.payment_method = null;
+    orderState.tg_id = tgId;
+    document.getElementById('methodTpay')?.classList.remove('selected');
+    document.getElementById('methodAdmin')?.classList.remove('selected');
+    document.getElementById('adminPayBlock')?.classList.add('hidden');
+    document.getElementById('screenshotError')?.classList.add('hidden');
+    document.querySelector('.wizard-footer')?.classList.remove('hidden');
+    showScreen('wizard');
+    fetchServices();
+    fetchDistricts();
+    if (!map) setTimeout(initMap, 300);
+    renderChildTimings();
+    renderComplaints('adult');
+    renderSlots('adult');
+  }
+
+  function updateWizardUI() {
+    document.querySelectorAll('.wizard-step').forEach((p, i) => {
+      p.classList.toggle('active', i === wizardStep - 1);
+    });
+    const pct = (wizardStep / wizardTotal) * 100;
+    const bar = document.getElementById('wizardProgress');
+    if (bar) bar.style.width = pct + '%';
+    const lbl = document.getElementById('wizardStepLabel');
+    if (lbl) lbl.textContent = tr('step_of')(wizardStep, wizardTotal);
+    const dots = document.getElementById('wizardDots');
+    if (dots) {
+      dots.innerHTML = Array.from({ length: wizardTotal }, (_, i) => {
+        const n = i + 1;
+        let cls = '';
+        if (n < wizardStep) cls = 'done';
+        else if (n === wizardStep) cls = 'active';
+        return `<span class="${cls}"></span>`;
+      }).join('');
+    }
+    const btn = document.getElementById('wizardNextBtn');
+    if (btn) {
+      btn.classList.remove('btn-pay');
+      if (wizardStep === wizardTotal) {
+        btn.textContent =
+          orderState.payment_method === 'tpay'
+            ? '🔒 ' + tr('pay')
+            : '🔒 ' + tr('confirm_order');
+        btn.classList.add('btn-pay');
+      } else {
+        btn.textContent = tr('continue') + ' →';
+      }
+    }
+    applyI18n();
+    initIcons();
+  }
+
+  function wizardNext() {
+    if (!validateWizard()) return;
+    if (wizardStep === wizardTotal) {
+      submitOrder();
+      return;
+    }
+    if (wizardStep === 3 && orderState.patient_type === 'adult') wizardStep = 5;
+    else wizardStep++;
+    if (wizardStep === 8) fillSummary();
+    updateWizardUI();
+  }
+
+  function wizardPrev() {
+    if (wizardStep === 5 && orderState.patient_type === 'adult') wizardStep = 3;
+    else if (wizardStep > 1) wizardStep--;
+    updateWizardUI();
+  }
+
+  function validateWizard() {
+    if (wizardStep === 1 && !orderState.service) {
+      alert(tr('alert_select_service'));
+      return false;
+    }
+    if (wizardStep === 2 && !orderState.patient_type) {
+      alert(tr('alert_select_patient'));
+      return false;
+    }
+    if (wizardStep === 3) {
+      orderState.patient_name = document.getElementById('patientName')?.value.trim() || '';
+      orderState.patient_age = document.getElementById('patientAge')?.value || '';
+      if (!orderState.patient_name || !orderState.patient_age || !orderState.patient_gender) {
+        alert(tr('alert_fill_data'));
+        return false;
+      }
+    }
+    if (wizardStep === 4 && orderState.patient_type === 'child') {
+      if (!orderState.child_timing || orderState.uses_diaper === null) {
+        alert(tr('alert_child_params'));
+        return false;
+      }
+    }
+    if (wizardStep === 6 && !orderState.pickup_slot) {
+      alert(tr('alert_select_time'));
+      return false;
+    }
+    if (wizardStep === 7) {
+      if (orderState.locationServed === null) {
+        alert(tr('alert_send_location'));
+        return false;
+      }
+      const served = orderState.locationServed === true;
+      const phoneEl = served ? document.getElementById('phoneInput') : document.getElementById('phoneInputExtra');
+      const phoneErr = served ? document.getElementById('phoneError') : document.getElementById('phoneErrorExtra');
+      const phoneRaw = (phoneEl?.value || '').replace(/\D/g, '');
+      if (phoneRaw.length !== 9) {
+        phoneErr?.classList.remove('hidden');
+        return false;
+      }
+      phoneErr?.classList.add('hidden');
+      orderState.phone = '+998' + phoneRaw;
+      orderState.address_note = served
+        ? document.getElementById('addressNote')?.value.trim() || ''
+        : document.getElementById('addressNoteExtra')?.value.trim() || '';
+      if (orderState.detectedAddress && !orderState.address_note) {
+        orderState.address_note = orderState.detectedAddress;
+      }
+      const dst = districtsData.find((d) => String(d.id) === String(orderState.district));
+      if (!orderState.district || !isDistrictServed(dst)) {
+        alert(tr('alert_select_district'));
+        return false;
+      }
+    }
+    if (wizardStep === 8) {
+      /* xulosa — faqat ko'rish */
+    }
+    if (wizardStep === 9) {
+      if (!orderState.payment_method) {
+        alert(tr('alert_select_pay'));
+        return false;
+      }
+      if (orderState.payment_method === 'admin') {
+        const fi = document.getElementById('paymentScreenshot');
+        if (!fi?.files?.length) {
+          document.getElementById('screenshotError')?.classList.remove('hidden');
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  async function fetchServices() {
+    const list = document.getElementById('servicesList');
+    if (!list) return;
+    list.innerHTML = '<div class="empty-state">' + tr('loading') + '</div>';
+    try {
+      const data = await api('/api/services/');
+      servicesData = Array.isArray(data) ? data : data.results || [];
+      list.innerHTML = servicesData
+        .filter((s) => s.is_active !== false)
+        .map((s, idx) => {
+          const icCls = ['ic-green', 'ic-purple', 'ic-blue', 'ic-amber'][idx % 4];
+          const iconHtml = s.icon_url
+            ? `<img src="${s.icon_url}" alt="">`
+            : `<span>🧪</span>`;
+          const subtitle = s.description
+            ? `<div class="srv-subtitle">${s.description}</div>`
+            : '';
+          return `
+        <div class="card-white" id="srv_${s.id}" onclick="window.NMED.selectService(${s.id})">
+          <div class="srv-row">
+            <div class="srv-icon-wrap ${icCls}">${iconHtml}</div>
+            <div class="srv-info">
+              <div class="srv-name">${serviceName(s)}</div>
+              ${subtitle}
+              <div class="srv-price">${Number(s.price).toLocaleString()} ${tr('currency')}</div>
+            </div>
+            <span class="srv-chevron">›</span>
+          </div>
+        </div>`;
+        })
+        .join('');
+    } catch (e) {
+      list.innerHTML = '<div class="empty-state">' + tr('services_fail') + '</div>';
+    }
+  }
+
+  async function fetchDistricts() {
+    try {
+      const data = await api('/api/districts/');
+      districtsData = Array.isArray(data) ? data : data.results || [];
+      const sel = document.getElementById('districtSelect');
+      if (sel) {
+        sel.innerHTML =
+          '<option value="">' + tr('select_district') + '</option>' +
+          districtsData.map((d) => `<option value="${d.id}">${d.name}</option>`).join('');
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+
+  function selectService(id) {
+    orderState.service = id;
+    document.querySelectorAll('[id^="srv_"]').forEach((el) => el.classList.remove('selected'));
+    document.getElementById(`srv_${id}`)?.classList.add('selected');
+  }
+
+  function selectPatientType(type) {
+    orderState.patient_type = type;
+    document.getElementById('pTypeAdult')?.classList.toggle('selected', type === 'adult');
+    document.getElementById('pTypeChild')?.classList.toggle('selected', type === 'child');
+    renderComplaints(type);
+    renderSlots(type);
+  }
+
+  function selectGender(g) {
+    orderState.patient_gender = g;
+    document.getElementById('genderMale')?.classList.toggle('selected', g === 'male');
+    document.getElementById('genderFemale')?.classList.toggle('selected', g === 'female');
+  }
+
+  function renderChildTimings() {
+    const grid = document.getElementById('childTimingsGrid');
+    if (!grid) return;
+    const items = [
+      { id: 'morning', t: tr('ct_morning') },
+      { id: 'day', t: tr('ct_day') },
+      { id: 'evening', t: tr('ct_evening') },
+      { id: 'irregular', t: tr('ct_irregular') },
+    ];
+    grid.innerHTML = items
+      .map(
+        (x) =>
+          `<button type="button" class="choice-block" id="ct_${x.id}" onclick="window.NMED.selectChildTiming('${x.id}')">${x.t}</button>`
+      )
+      .join('');
+  }
+
+  function selectChildTiming(id) {
+    orderState.child_timing = id;
+    document.querySelectorAll('[id^="ct_"]').forEach((el) => el.classList.remove('selected'));
+    document.getElementById(`ct_${id}`)?.classList.add('selected');
+    renderSlots('child');
+  }
+
+  function selectDiaper(v) {
+    orderState.uses_diaper = v;
+    document.getElementById('diaperYes')?.classList.toggle('selected', v === true);
+    document.getElementById('diaperNo')?.classList.toggle('selected', v === false);
+  }
+
+  function renderComplaints(type) {
+    const box = document.getElementById('complaintsBox');
+    if (!box) return;
+    const list = tr('complaints') || [];
+    box.innerHTML = list
+      .map(
+        (c) => `
+      <label class="choice-card">
+        <input type="checkbox" value="${c}" onchange="window.NMED.toggleComplaint(this)"/>
+        <span>${type === 'child' ? '👶' : '🧑'} ${c}</span>
+      </label>`
+      )
+      .join('');
+    orderState.complaints = [];
+  }
+
+  function toggleComplaint(cb) {
+    if (cb.checked) orderState.complaints.push(cb.value);
+    else orderState.complaints = orderState.complaints.filter((v) => v !== cb.value);
+  }
+
+  function renderSlots(type) {
+    const box = document.getElementById('slotsBox');
+    if (!box) return;
+    const slotLabel = '18:00 — 22:00';
+    const slotValue = '18:00 — 22:00';
+    box.innerHTML = `
+      <div class="slot-card" id="slot_evening" onclick="window.NMED.selectSlot('${slotValue}', document.getElementById('slot_evening'))">
+        <div>
+          <div class="slot-time"><i data-lucide="moon" style="width:18px;height:18px;vertical-align:middle;margin-right:6px"></i>${slotLabel}</div>
+          <div class="slot-hint">${tr('slot_hint')}</div>
+        </div>
+      </div>`;
+    orderState.pickup_slot = '';
+    initIcons();
+  }
+
+  function selectSlot(s, el) {
+    orderState.pickup_slot = s;
+    document.querySelectorAll('.slot-card').forEach((n) => n.classList.remove('selected'));
+    if (el) el.classList.add('selected');
+    initIcons();
+  }
+
+  function selectPayMethod(m) {
+    orderState.payment_method = m;
+    document.getElementById('methodTpay')?.classList.toggle('selected', m === 'tpay');
+    document.getElementById('methodAdmin')?.classList.toggle('selected', m === 'admin');
+    document.getElementById('adminPayBlock')?.classList.toggle('hidden', m !== 'admin');
+    if (wizardStep === wizardTotal) updateWizardUI();
+  }
+
+  function fillSummary() {
+    const srv = servicesData.find((s) => s.id == orderState.service);
+    const sP = srv ? parseFloat(srv.price) : 0;
+    const set = (id, t) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = t;
+    };
+    set('summaryService', serviceName(srv));
+    set('summaryPatient', `${orderState.patient_name}, ${orderState.patient_age} ${tr('years')}`);
+    set('summaryTime', orderState.pickup_slot || '—');
+    set('summaryDelivery', tr('delivery_free'));
+    set('summaryTotal', `${sP.toLocaleString()} ${tr('currency')}`);
+  }
+
+  function isDistrictServed(d) {
+    if (!d) return false;
+    if (d.is_active === false || d.is_active === 'false' || d.is_active === 0) return false;
+    return true;
+  }
+
+  function initMap() {
+    const el = document.getElementById('map');
+    if (!el || typeof L === 'undefined') return;
+    map = L.map('map').setView([orderState.latitude, orderState.longitude], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    marker = L.marker([orderState.latitude, orderState.longitude], { draggable: true }).addTo(map);
+    marker.on('dragend', () => {
+      const c = marker.getLatLng();
+      orderState.latitude = c.lat;
+      orderState.longitude = c.lng;
+    });
+  }
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const toRad = (x) => (x * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  function setLocSpinner(on) {
+    document.getElementById('locSpinner')?.classList.toggle('hidden', !on);
+  }
+
+  function showServedBlock(district, humanAddress) {
+    orderState.locationServed = true;
+    orderState.district = String(district.id);
+    document.getElementById('districtSelect').value = district.id;
+    document.getElementById('locServedBlock')?.classList.remove('hidden');
+    document.getElementById('locUnservedBlock')?.classList.add('hidden');
+    const addr = document.getElementById('detectedAddressText');
+    const fee = document.getElementById('deliveryFeeText');
+    if (addr) addr.textContent = humanAddress || district.name;
+    if (fee) fee.textContent = `${tr('delivery_label')} ${tr('delivery_free')}`;
+    orderState.detectedAddress = humanAddress || district.name;
+  }
+
+  function showUnservedBlock(humanAddress) {
+    orderState.locationServed = false;
+    orderState.district = null;
+    document.getElementById('districtSelect').value = '';
+    document.getElementById('locServedBlock')?.classList.add('hidden');
+    document.getElementById('locUnservedBlock')?.classList.remove('hidden');
+    const t = document.getElementById('unservedAddressText');
+    if (t) t.textContent = humanAddress || tr('unserved_hint');
+    renderUnservedDistricts();
+  }
+
+  function renderUnservedDistricts() {
+    const box = document.getElementById('unservedDistrictList');
+    if (!box) return;
+    const served = districtsData.filter((d) => isDistrictServed(d));
+    if (!served.length) {
+      box.innerHTML = '<div class="empty-state">' + tr('no_districts') + '</div>';
+      return;
+    }
+    box.innerHTML = served
+      .map(
+        (d) => `
+      <button type="button" class="district-pick ${orderState.district == d.id ? 'selected' : ''}"
+        onclick="window.NMED.selectUnservedDistrict(${d.id})">
+        <span>🏘️ ${d.name}</span>
+        <span class="district-pick-meta">${tr('delivery_free')}</span>
+      </button>`
+      )
+      .join('');
+  }
+
+  function selectUnservedDistrict(id) {
+    const d = districtsData.find((x) => x.id == id);
+    if (!d) return;
+    orderState.district = String(id);
+    document.getElementById('districtSelect').value = id;
+    if (d.latitude && d.longitude && map) {
+      map.setView([parseFloat(d.latitude), parseFloat(d.longitude)], 13);
+      marker.setLatLng([parseFloat(d.latitude), parseFloat(d.longitude)]);
+      orderState.latitude = parseFloat(d.latitude);
+      orderState.longitude = parseFloat(d.longitude);
+    }
+    renderUnservedDistricts();
+  }
+
+  async function onLocOk(pos) {
+    setLocSpinner(false);
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    orderState.latitude = lat;
+    orderState.longitude = lng;
+    if (map) {
+      map.setView([lat, lng], 14);
+      marker.setLatLng([lat, lng]);
+      setTimeout(() => map.invalidateSize(), 200);
+    }
+
+    if (!districtsData.length) {
+      alert(tr('alert_districts_fail'));
+      return;
+    }
+
+    let humanAddress = null;
+    try {
+      const geo = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=16&addressdetails=1`,
+        { headers: { 'Accept-Language': 'uz,ru;q=0.8' } }
+      );
+      const geoData = await geo.json();
+      if (geoData?.address) {
+        const a = geoData.address;
+        const parts = [
+          a.road || a.pedestrian,
+          a.suburb || a.neighbourhood || a.quarter,
+          a.city_district,
+          a.city || a.town,
+        ].filter(Boolean);
+        humanAddress = parts.join(', ') || geoData.display_name?.split(',').slice(0, 3).join(', ');
+      }
+    } catch (e) {
+      console.warn('reverse geocode', e);
+    }
+
+    const ranked = [];
+    districtsData.forEach((d) => {
+      if (d.latitude == null || d.longitude == null) return;
+      ranked.push({ d, dist: haversine(lat, lng, parseFloat(d.latitude), parseFloat(d.longitude)) });
+    });
+    ranked.sort((a, b) => a.dist - b.dist);
+    const detected = ranked[0];
+    if (!detected) {
+      showUnservedBlock(humanAddress);
+      return;
+    }
+
+    if (detected.dist > 35) {
+      document.getElementById('locResult').innerHTML =
+        '<div class="info-card warn"><div class="info-card-title">' + tr('out_of_area') + '</div><div class="info-card-body">' + tr('out_of_area_body') + '</div></div>';
+      showUnservedBlock(humanAddress);
+      return;
+    }
+
+    const best = detected.d;
+    if (isDistrictServed(best)) {
+      document.getElementById('locResult').innerHTML = '';
+      showServedBlock(best, humanAddress || best.name);
+    } else {
+      document.getElementById('locResult').innerHTML =
+        '<div class="info-card warn"><div class="info-card-body">' + tr('no_service_here') + '</div></div>';
+      showUnservedBlock(humanAddress || best.name);
+    }
+  }
+
+  function onLocErr() {
+    setLocSpinner(false);
+    document.getElementById('locResult').innerHTML =
+      '<div class="info-card warn"><div class="info-card-body">' + tr('gps_error') + '</div></div>';
+    showUnservedBlock(null);
+  }
+
+  async function requestLocation() {
+    if (!navigator.geolocation) {
+      alert(tr('alert_geo_unsupported'));
+      showUnservedBlock(null);
+      return;
+    }
+    setLocSpinner(true);
+    navigator.geolocation.getCurrentPosition(onLocOk, onLocErr, {
+      enableHighAccuracy: true,
+      timeout: 25000,
+      maximumAge: 0,
+    });
+  }
+
+  async function submitOrder() {
+    const extra = document.getElementById('extraComplaint')?.value?.trim();
+    if (extra) orderState.custom_complaint = extra;
+    fillSummary();
+
+    const btn = document.getElementById('wizardNextBtn');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.textContent = '⏳ ...';
+
+    const fd = new FormData();
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+    if (csrf) fd.append('csrfmiddlewaretoken', csrf);
+    const skipKeys = new Set(['locationServed', 'detectedAddress']);
+    for (const [k, v] of Object.entries(orderState)) {
+      if (v == null || v === '' || skipKeys.has(k)) continue;
+      if (k === 'complaints') {
+        fd.append(k, JSON.stringify(v));
+      } else if (k === 'uses_diaper' || typeof v === 'boolean') {
+        fd.append(k, v ? 'true' : 'false');
+      } else {
+        fd.append(k, v);
+      }
+    }
+    if (orderState.payment_method === 'admin') {
+      const fi = document.getElementById('paymentScreenshot');
+      if (fi?.files?.[0]) {
+        try {
+          const compressed = await compressScreenshotFile(fi.files[0]);
+          fd.append('screenshot', compressed, compressed.name || 'screenshot.jpg');
+        } catch (cmpErr) {
+          fd.append('screenshot', fi.files[0]);
+        }
+      }
+    }
+
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 90000);
+      const res = await fetch('/tspay/orders/', { method: 'POST', body: fd, signal: controller.signal });
+      clearTimeout(timer);
+      if (res.status === 413) {
+        alertError(tr('screenshot_too_large'));
+        return;
+      }
+      const rawText = await res.text();
+      let data = {};
+      if (rawText) {
+        try {
+          data = JSON.parse(rawText);
+        } catch (parseErr) {
+          if (!res.ok) {
+            alertError(rawText.slice(0, 200) || tr('error_server'));
+            return;
+          }
+        }
+      }
+      if (!res.ok || data.success === false) {
+        alertError(formatApiError(data) || tr('error_server'));
+        return;
+      }
+      if (orderState.payment_method === 'admin') {
+        showOrderSuccess(data.order_code || `NMED-${String(data.order_id || '').padStart(5, '0')}`);
+        return;
+      }
+      if (data.payment_url) {
+        sessionStorage.setItem('tspay_cheque_id', data.cheque_id);
+        sessionStorage.setItem('tspay_order_id', String(data.order_id));
+        sessionStorage.setItem('tspay_order_code', data.order_code || '');
+        if (tg?.openLink) tg.openLink(data.payment_url);
+        else window.location.href = data.payment_url;
+        return;
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') alertError(tr('error') + ' (timeout)');
+      else alertError(e.message || tr('error'));
+    } finally {
+      if (!wizardSuccessMode && btn) {
+        btn.disabled = false;
+        updateWizardUI();
+      }
+    }
+  }
+
+  function showOrderSuccess(orderCode, subtitle) {
+    lastOrderCode = orderCode || '';
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('uz-UZ');
+    const timeStr = now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+    const code = escapeHtml(orderCode || '—');
+    const title = escapeHtml(subtitle || tr('success_accepted'));
+    const body = document.getElementById('wizardBody');
+    if (!body) {
+      alertError(tr('success_accepted') + (orderCode ? ' #' + orderCode : ''));
+      return;
+    }
+    wizardSuccessMode = true;
+    body.innerHTML = `
+      <div class="order-success-screen">
+        <div class="success-top-label">${escapeHtml(tr('success_label'))}</div>
+        <div class="success-card-premium">
+          <div class="success-check-ring">✓</div>
+          <h2>${title}</h2>
+          <ul class="success-steps-list">
+            <li><span class="ss-ic"><i data-lucide="flask-conical"></i></span><span>${escapeHtml(tr('success_step1'))}</span></li>
+            <li><span class="ss-ic"><i data-lucide="phone"></i></span><span>${escapeHtml(tr('success_step2'))}</span></li>
+            <li><span class="ss-ic"><i data-lucide="microscope"></i></span><span>${escapeHtml(tr('success_step3'))}</span></li>
+            <li><span class="ss-ic"><i data-lucide="file-text"></i></span><span>${escapeHtml(tr('success_step4'))}</span></li>
+          </ul>
+          <div class="success-order-box">
+            <div class="success-order-label">${escapeHtml(tr('order_number'))}</div>
+            <div class="success-order-id">#${code}</div>
+            <div class="success-order-date">${dateStr} · ${timeStr}</div>
+          </div>
+        </div>
+        <button type="button" class="btn-cta success-close-btn" onclick="window.NMED.goHome()">${escapeHtml(tr('close'))}</button>
+      </div>`;
+    document.querySelector('.wizard-footer')?.classList.add('hidden');
+    const btn = document.getElementById('wizardNextBtn');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = tr('close');
+    }
+    showScreen('wizard');
+    try {
+      initIcons();
+    } catch (iconErr) {
+      /* lucide ixtiyoriy */
+    }
+    window.scrollTo(0, 0);
+    body.scrollTop = 0;
+  }
+
+  /* ── ORDERS ── */
+  async function loadOrders() {
+    const el = document.getElementById('ordersList');
+    if (!el) return;
+    el.innerHTML = '<div class="empty-state">' + tr('loading') + '</div>';
+    try {
+      const orders = await api('/api/webapp/orders/');
+      if (!orders.length) {
+        el.innerHTML = '<div class="empty-state"><div class="emoji">📭</div><p>' + tr('no_orders') + '</p></div>';
+        return;
+      }
+      el.innerHTML = orders
+        .map(
+          (o) => `
+        <div class="order-card" onclick="window.NMED.openOrder(${o.id})">
+          <div class="code">${o.order_code}</div>
+          <div class="title">${o.service_name}</div>
+          <div style="font-size:13px;color:#64748b">${o.created_at}</div>
+          <span class="status-badge status-${o.status}">${statusText(o.status)}</span>
+          <div style="margin-top:8px;font-weight:700">${Number(o.total_price).toLocaleString()} ${tr('currency')}</div>
+        </div>`
+        )
+        .join('');
+    } catch (e) {
+      el.innerHTML = '<div class="empty-state">' + tr('error') + '</div>';
+    }
+  }
+
+  function statusText(s) {
+    const m = tr('status') || {};
+    return m[s] || s;
+  }
+
+  async function openOrder(id) {
+    showScreen('order-detail');
+    const el = document.getElementById('orderDetailContent');
+    el.innerHTML = '<div class="empty-state">' + tr('loading') + '</div>';
+    try {
+      const o = await api(`/api/webapp/orders/${id}/`);
+      let tlHtml = (o.timeline || [])
+        .map(
+          (s) => `
+        <div class="timeline-item ${s.state}">
+          <div class="tl-dot">${s.icon}</div>
+          <div class="tl-text ${s.state === 'pending' ? 'muted' : ''}">${s.label}</div>
+        </div>`
+        )
+        .join('');
+      el.innerHTML = `
+        <h2 style="margin:0 0 4px">${o.order_code}</h2>
+        <p style="color:#64748b;font-size:13px;margin:0 0 16px">${o.created_at}</p>
+        <div class="order-card" style="cursor:default">
+          <div><b>${o.service_name}</b></div>
+          <div style="font-size:13px;margin-top:8px">👤 ${o.patient_name || '—'}, ${o.patient_age || '—'} ${tr('years')}</div>
+          <div style="font-size:13px">📍 ${o.district_name || '—'}</div>
+          <div style="font-size:13px">🕐 ${o.pickup_slot || '—'}</div>
+          <div style="font-weight:700;margin-top:12px">${Number(o.total_price).toLocaleString()} ${tr('currency')}</div>
+        </div>
+        <h3 style="font-size:15px">${tr('order_status_title')}</h3>
+        <div class="timeline">${tlHtml}</div>
+        ${
+          o.result_url
+            ? `<a href="${o.result_url}" target="_blank" class="btn-primary" style="display:block;text-align:center;text-decoration:none;margin-top:16px">${tr('view_result')}</a>`
+            : ''
+        }`;
+    } catch (e) {
+      el.innerHTML = '<div class="empty-state">' + tr('not_found') + '</div>';
+    }
+  }
+
+  /* ── RESULTS ── */
+  async function loadResults() {
+    const el = document.getElementById('resultsList');
+    if (!el) return;
+    el.innerHTML = '<div class="empty-state">' + tr('loading') + '</div>';
+    try {
+      const items = await api('/api/webapp/results/');
+      if (!items.length) {
+        el.innerHTML = '<div class="empty-state"><div class="emoji">📭</div><p>' + tr('no_results') + '</p></div>';
+        return;
+      }
+      el.innerHTML = items
+        .map(
+          (r) => `
+        <div class="order-card">
+          <div class="code">${r.order_code}</div>
+          <div class="title">${r.service_name}</div>
+          <div style="font-size:13px;color:#64748b">📅 ${r.created_at}</div>
+          ${r.doctor_conclusion ? `<p style="font-size:13px;margin-top:8px"><i>${r.doctor_conclusion}</i></p>` : ''}
+          <a href="${r.result_url}" target="_blank" class="btn-primary" style="display:block;text-align:center;text-decoration:none;margin-top:12px;font-size:14px;padding:12px">${tr('download_result')}</a>
+        </div>`
+        )
+        .join('');
+    } catch (e) {
+      el.innerHTML = '<div class="empty-state">' + tr('error') + '</div>';
+    }
+  }
+
+  /* ── PROFILE ── */
+  async function loadProfile() {
+    const el = document.getElementById('profileContent');
+    if (!el) return;
+    try {
+      const p = await api('/api/webapp/profile/');
+      const bar =
+        '🟦'.repeat(p.cycle_position) + '⬜'.repeat(Math.max(0, 6 - p.cycle_position));
+      el.innerHTML = `
+        <div class="profile-card">
+          <div style="font-size:12px;opacity:.8">MED ID</div>
+          <div style="font-size:22px;font-weight:800;margin:4px 0">${p.patient_id}</div>
+          <div style="font-size:15px">${p.first_name || '—'}</div>
+          <div style="font-size:12px;opacity:.7;margin-top:8px">📅 ${p.date_joined}</div>        </div>
+        <div class="order-card" style="cursor:default">
+          <div>📦 ${tr('profile_total')} <b>${p.total_orders}</b></div>
+          <div style="margin-top:8px">✅ ${tr('profile_completed')} <b>${p.completed_orders}</b></div>
+        </div>`;
+    } catch (e) {
+      el.innerHTML = '<div class="empty-state">' + tr('profile_fail') + '</div>';
+    }
+  }
+
+  async function submitAppeal() {
+    const msg = document.getElementById('appealText')?.value?.trim();
+    if (!msg) return alert(tr('alert_write_message'));
+    try {
+      await api('/api/webapp/appeal/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tg_id: tgId, message: msg }),
+      });
+      alert(tr('alert_thanks'));
+      document.getElementById('appealText').value = '';
+      goHome();
+    } catch (e) {
+      alert(tr('error'));
+    }
+  }
+
+  function openSupport() {
+    const phone = appSettings.support_phone || '';
+    const tgLink = appSettings.support_telegram || '';
+    if (tgLink) tg.openTelegramLink?.(tgLink) || window.open(tgLink);
+    else if (phone) tg.openLink?.('tel:' + phone);
+  }
+
+  function bindWizardEvents() {
+    document.getElementById('paymentScreenshot')?.addEventListener('change', onScreenshotChange);
+  }
+
+  /** iPhone skrinshotini siqish — nginx 413 oldini olish */
+  function compressScreenshotFile(file, maxSide = 1600, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+      if (!file || !file.type.startsWith('image/')) {
+        resolve(file);
+        return;
+      }
+      if (file.size < 900000) {
+        resolve(file);
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let w = img.width;
+        let h = img.height;
+        const scale = Math.min(1, maxSide / Math.max(w, h));
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            resolve(new File([blob], 'screenshot.jpg', { type: 'image/jpeg', lastModified: Date.now() }));
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      };
+      img.src = url;
+    });
+  }
+
+  function onScreenshotChange() {
+    const fi = document.getElementById('paymentScreenshot');
+    if (fi?.files?.[0]) {
+      const r = new FileReader();
+      r.onload = (e) => {
+        const img = document.getElementById('screenshotPreviewImg');
+        const box = document.getElementById('screenshotPreview');
+        if (img) img.src = e.target.result;
+        box?.classList.remove('hidden');
+        document.getElementById('screenshotError')?.classList.add('hidden');
+      };
+      r.readAsDataURL(fi.files[0]);
+    }
+  }
+
+  /* ── INIT ── */
+  document.getElementById('btnBack')?.addEventListener('click', () => {
+    if (document.getElementById('screen-wizard')?.classList.contains('active') && wizardStep > 1) {
+      wizardPrev();
+    } else goHome();
+  });
+
+  document.getElementById('btnOrderMain')?.addEventListener('click', startWizard);
+  document.querySelectorAll('[data-goto]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const page = el.dataset.goto;
+      if (page === 'order') startWizard();
+      else showScreen(page);
+    });
+  });
+
+  document.getElementById('wizardNextBtn')?.addEventListener('click', wizardNext);
+  document.getElementById('btnAppealSend')?.addEventListener('click', submitAppeal);
+  document.getElementById('btnSupportTg')?.addEventListener('click', openSupport);
+  document.getElementById('btnLoc')?.addEventListener('click', requestLocation);
+  bindWizardEvents();
+
+  window.NMED = {
+    selectService,
+    selectPatientType,
+    selectGender,
+    selectChildTiming,
+    selectDiaper,
+    toggleComplaint,
+    selectSlot,
+    selectPayMethod,
+    selectUnservedDistrict,
+    openOrder,
+    goHome,
+    startWizard,
+  };
+
+  initLang().then(() => {
+    const wb = document.getElementById('wizardBody');
+    if (wb) wizardBodyTemplate = wb.innerHTML;
+    applyI18n();
+    initIcons();
+    loadSettings().then(() => {
+      initHome();
+      orderState.tg_id = tgId;
+      if (initialPage === 'order') showScreen('home');
+      else if (initialPage !== 'home') showScreen(initialPage);
+      else showScreen('home');
+
+      if (wizardStep === 8) fillSummary();
+      checkTspayReturn();
+    });
+  });
+
+  async function pollPaymentStatus(orderId, orderCode, attempts = 8) {
+    const code = orderCode || `NMED-${String(orderId).padStart(5, '0')}`;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const r = await fetch(`/tspay/orders/${orderId}/check_payment/?tg_id=${encodeURIComponent(tgId || '')}`);
+        const result = await r.json();
+        if (result.success && (result.status === 'paid' || result.order_status === 'paid')) {
+          return { paid: true, code: result.order_code || code };
+        }
+        if (result.status === 'failed' || result.status === 'canceled') {
+          return { paid: false, code, detail: result.detail || tr('error') };
+        }
+      } catch (e) {
+        /* retry */
+      }
+      if (i < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
+    return { paid: false, code, pending: true };
+  }
+
+  async function checkTspayReturn() {
+    const params = new URLSearchParams(location.search);
+    const fromUrl = params.get('tspay_return');
+    const chequeId = sessionStorage.getItem('tspay_cheque_id');
+    const orderId = sessionStorage.getItem('tspay_order_id');
+    const orderCode = sessionStorage.getItem('tspay_order_code');
+    if (!fromUrl && !chequeId && !orderId) return;
+
+    const oid = orderId || params.get('order_id');
+    if (!oid) return;
+
+    sessionStorage.removeItem('tspay_cheque_id');
+    sessionStorage.removeItem('tspay_order_id');
+    sessionStorage.removeItem('tspay_order_code');
+
+    showScreen('wizard');
+    const body = document.getElementById('wizardBody');
+    if (body) {
+      body.innerHTML = `<div class="empty-state" style="padding:48px 24px"><p>${escapeHtml(tr('pay_checking'))}</p></div>`;
+    }
+
+    const outcome = await pollPaymentStatus(oid, orderCode);
+    if (outcome.paid) {
+      showOrderSuccess(outcome.code);
+      return;
+    }
+    if (outcome.pending) {
+      showOrderSuccess(outcome.code, tr('pay_checking'));
+      return;
+    }
+    alertError(outcome.detail || tr('error'));
+  }
+})();

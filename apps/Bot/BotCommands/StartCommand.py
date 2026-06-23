@@ -19,6 +19,7 @@ WEB_APP_URL = os.getenv(
     "https://n-medhomelab.uz/",
 )
 
+
 # ─── TRANSLATIONS ──────────────────────────────────────────────────────────────
 MESSAGES = {
     "welcome": {
